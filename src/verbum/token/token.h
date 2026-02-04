@@ -3,22 +3,21 @@
 
 #include <stdint.h>
 
-/* Identifier and keyword charset */
-#define RULE_CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_1234567890-"
 /* Operator charset */
-#define RULE_START_CHAR '<'
-#define RULE_END_CHAR '>'
-#define OR_CHAR '|'
-
-#define OPERATOR_CHARS "=:|"
-/* Literal charset */
-#define LITERAL_CHARS "\'\""
+#define OPERATOR_CHARS "=|[]{}(),;"
 /* Invalid charset */
-#define INVALID_CHARS ",?&^!+*/%~)(][}{.;"
+#define INVALID_CHARS "?&^!+/%~.<>"
 /* Whitespace charset */
 #define WHITE_SPACE " \t\n\v\f\r"
 /* Invalid charset for an identifier or keyword */
-#define INVALID_RULE_CHARS OPERATOR_CHARS INVALID_CHARS WHITE_SPACE LITERAL_CHARS
+#define INVALID_IDENTIFIER_CHARS OPERATOR_CHARS INVALID_CHARS WHITE_SPACE
+
+/* Identifier and keyword charset */
+#define LETTER_CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define DIGIT_CHARS "1234567890"
+#define SYMBOL_CHARS "`~!@#$%^&*()-_+={}[]|\\:;\"\'<>?,./"
+
+#define IDENTIFIER_CHARS LETTER_CHARS DIGIT_CHARS "_"
 
 
 /* Simple alias for const char * */
@@ -30,12 +29,24 @@ typedef enum TokenType {
         TokenType_EOF = -1, // EOF
 
 	TokenType_Whitespace,
-        TokenType_RuleName, // <abc>, <ABC>, <_aBc>, <a123_b>, <a123-b>
+        TokenType_NonTerminal_Identifier, // abC_12
+        TokenType_Terminal_Identifier, // $aBc32_
 	TokenType_Literal, // "hello", 'hello'
 
-	TokenType_Evaluate, // ::=
-
-        TokenType_Or, // |
+	TokenType_Operator,
+	TokenType_Equal, // =
+        TokenType_Pipe, // |
+	TokenType_Hyphen, // -
+	TokenType_Comma, // ,
+	TokenType_LeftBracket, // [
+	TokenType_RightBracket, // ]
+	TokenType_LeftBrace, // {
+	TokenType_RightBrace, // }
+	TokenType_LeftParenthesis, // (
+	TokenType_RightParenthesis, // )
+	TokenType_LeftComment, // (*
+	TokenType_RightComment, // *)
+	TokenType_RuleDeclarationEnd, // ;
 } TokenType;
 
 /* Token

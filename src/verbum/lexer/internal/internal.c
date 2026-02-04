@@ -10,10 +10,28 @@
 
 #include "internal.h"
 
+/*
+$COMMENT        = "(*" , { $CHARACTER } - ( { $CHARACTER } , "*)" , { $CHARACTER } ) , "*)" ;
+$NONTERMINAL_IDENTIFIER     = $LETTER , { $LETTER | $DIGIT | "_" } ;
+$TERMINAL_IDENTIFIER = "$" , ( $LETTER | "_" ) , { $LETTER | $DIGIT | "_" } ;
+$LITERAL        = "'" , { $CHARACTER - "'" } , "'" 
+               | '"' , { $CHARACTER - '"' } , '"' ;
+$LETTER         = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+	       | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+	       | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+	       | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+$DIGIT          = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+$SYMBOL	       = "`" | "~" | "!" | "@" | "#" | "$" | "%" | "^" | "&" | "*" | "(" | ")" | "_"
+	       | "-" | "+" | "=" | "{" | "}" | "[" | "]" | ":" | ";" | "<" | ">" | "," | "."
+	       | "?" | "/" | "|" | "\" | "'" | '"' ;
+$CHARACTER      =  $LETTER | $DIGIT | $SYMBOL ;
+*/
 
-static Token lexer_lex_rule_name(Lexer *l);
+static Token lexer_lex_nonterminal_identifier(Lexer *l);
+static Token lexer_lex_terminal_identifier(Lexer *l);
 static Token lexer_lex_operator(Lexer *l);
-static Token lexer_lex_literal(Lexer *l, char end_char);
+static Token lexer_lex_literal(Lexer *l);
+//static Token lexer_lex_comment(Lexer *l);
 
 utf8_int32_t lexer_advance(Lexer *l) {
 	utf8_int32_t result = '\0';
@@ -95,12 +113,16 @@ Token lexer_lex(Lexer *l) {
 		return lexer_lex_operator(l);
 	}
 
-	if(utf8chr(LITERAL_CHARS, c)) {
-		return lexer_lex_literal(l, c);
+	if(utf8chr("$", c)) {
+		return lexer_lex_terminal_identifier(l);
 	}
 
-	if(c == RULE_START_CHAR) {
-		return lexer_lex_rule_name(l);
+	if(utf8chr(LETTER_CHARS "_", c)) {
+		return lexer_lex_nonterminal_identifier(l);
+	}
+
+	if(utf8chr("\"" "\'", c)) {
+		return lexer_lex_literal(l);
 	}
 
 	if(utf8chr(INVALID_CHARS, c)) {
@@ -110,14 +132,13 @@ Token lexer_lex(Lexer *l) {
 
 	lexer_advance(l);
 
-
 	return result;
 }
 
-Token lexer_lex_rule_name(Lexer *l) {
+Token lexer_lex_terminal_identifier(Lexer *l) {
 	Token result = {
 		.lexeme = NULL,
-		.type = TokenType_RuleName,
+		.type = TokenType_Terminal_Identifier,
 		.pos = {
 			.row = l->pos.row,
 			.col = l->pos.col,
@@ -125,15 +146,37 @@ Token lexer_lex_rule_name(Lexer *l) {
 	};
 	size_t len = 1;
 
-	lexer_advance(l);
+	if(utf8chr("_" LETTER_CHARS, lexer_advance(l)) == NULL) {
+		// error
+	}
 
 	do {
 		len += utf8codepointsize(lexer_current_character(l));
-		lexer_advance(l);
-	} while(utf8chr(INVALID_RULE_CHARS, lexer_current_character(l)) == NULL && lexer_current_character(l) != RULE_END_CHAR);
+	} while(utf8chr(LETTER_CHARS DIGIT_CHARS "_", lexer_advance(l)) != NULL);
 
 	result.lexeme = utf8file_copy_from(l->f, utf8file_tell(l->f) - len, len);
-	lexer_advance(l);
+	lexer_undo(l);
+
+	return result;
+}
+
+Token lexer_lex_nonterminal_identifier(Lexer *l) {
+	Token result = {
+		.lexeme = NULL,
+		.type = TokenType_Terminal_Identifier,
+		.pos = {
+			.row = l->pos.row,
+			.col = l->pos.col,
+		},
+	};
+	size_t len = 1;
+
+	do {
+		len += utf8codepointsize(lexer_current_character(l));
+	} while(utf8chr(LETTER_CHARS DIGIT_CHARS "_", lexer_advance(l)) != NULL);
+
+	result.lexeme = utf8file_copy_from(l->f, utf8file_tell(l->f) - len, len);
+	lexer_undo(l);
 
 	return result;
 }
@@ -141,7 +184,7 @@ Token lexer_lex_rule_name(Lexer *l) {
 static Token lexer_lex_operator(Lexer *l) {
 	Token result = {
 		.lexeme = NULL,
-		.type = TokenType_Invalid,
+		.type = TokenType_Operator,
 		.pos = {
 			.row = l->pos.row,
 			.col = l->pos.col,
@@ -150,32 +193,42 @@ static Token lexer_lex_operator(Lexer *l) {
         utf8_int32_t peeked = lexer_peek_character(l);
 
         switch(lexer_current_character(l)) {
+        case '=':
+		result.lexeme = "=";
+                break;
 	case '|':
 		result.lexeme = "|";
-		result.type = TokenType_Or;
 		break;
-        case ':':
-		if(peeked == ':') {
-			lexer_advance(l);
-			peeked = lexer_peek_character(l);
-
-			if(peeked == '=') {
-				result.lexeme = "::=";
-				result.type = TokenType_Evaluate;
-				lexer_advance(l);
-			} else {
-				// Error
-			}
-		} else {
-			// Error
-		}
-                break;
+	case '[':
+		result.lexeme = "[";
+		break;
+	case ']':
+		result.lexeme = "]";
+		break;
+	case '{':
+		result.lexeme = "{";
+		break;
+	case '}':
+		result.lexeme = "}";
+		break;
+	case '(':
+		result.lexeme = "(";
+		break;
+	case ')':
+		result.lexeme = ")";
+		break;
+	case ',':
+		result.lexeme = ",";
+		break;
+	case ';':
+		result.lexeme = ";";
+		break;
         }
 
         return result;
 }
 
-static Token lexer_lex_literal(Lexer *l, char end_char) {
+static Token lexer_lex_literal(Lexer *l) {
 	Token result = {
 		.lexeme = NULL,
 		.type = TokenType_Literal,
@@ -185,14 +238,11 @@ static Token lexer_lex_literal(Lexer *l, char end_char) {
 		},
 	};
 	size_t len = 0;
+	char end = lexer_current_character(l);
 
 	do {
 		len += utf8codepointsize(lexer_advance(l));
-
-		if(lexer_current_character(l) == '\\') {
-			len += utf8codepointsize(lexer_advance(l));
-		}
-	} while(lexer_current_character(l) != end_char);
+	} while(lexer_current_character(l) != end);
 
 	result.lexeme = utf8file_copy_from(l->f, utf8file_tell(l->f) - len, len);
 

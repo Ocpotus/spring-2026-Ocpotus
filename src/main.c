@@ -5,10 +5,8 @@
 
 
 int main() {
-	Lexer *l = lexer_new("bnf.bnf");
-
+	Lexer *l = lexer_new("ebnf.ebnf");
 	Token t = { 0 };
-	printf("hello world\n");
 
 	do {
 		t = lexer_get_token(l);
@@ -17,7 +15,9 @@ int main() {
 			printf("%d %s\n", t.type, t.lexeme);
 		}
 
-		if(t.type == TokenType_Literal || t.type == TokenType_RuleName) {
+		if(t.type == TokenType_Literal ||
+		   t.type == TokenType_NonTerminal_Identifier ||
+		   t.type == TokenType_Terminal_Identifier) {
 			token_delete(t);
 		}
 	} while(t.type != TokenType_EOF);

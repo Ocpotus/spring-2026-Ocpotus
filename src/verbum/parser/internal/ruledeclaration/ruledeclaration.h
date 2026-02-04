@@ -1,0 +1,8 @@
+#ifndef VERBUM_PARSER_INTERNAL_RULE_DECLARATION
+#define VERBUM_PARSER_INTERNAL_RULE_DECLARATION
+
+#include "../../parser.h"
+
+
+
+#endif
