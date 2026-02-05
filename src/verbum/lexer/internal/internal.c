@@ -10,28 +10,11 @@
 
 #include "internal.h"
 
-/*
-$COMMENT        = "(*" , { $CHARACTER } - ( { $CHARACTER } , "*)" , { $CHARACTER } ) , "*)" ;
-$NONTERMINAL_IDENTIFIER     = $LETTER , { $LETTER | $DIGIT | "_" } ;
-$TERMINAL_IDENTIFIER = "$" , ( $LETTER | "_" ) , { $LETTER | $DIGIT | "_" } ;
-$LITERAL        = "'" , { $CHARACTER - "'" } , "'" 
-               | '"' , { $CHARACTER - '"' } , '"' ;
-$LETTER         = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
-	       | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
-	       | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
-	       | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-$DIGIT          = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-$SYMBOL	       = "`" | "~" | "!" | "@" | "#" | "$" | "%" | "^" | "&" | "*" | "(" | ")" | "_"
-	       | "-" | "+" | "=" | "{" | "}" | "[" | "]" | ":" | ";" | "<" | ">" | "," | "."
-	       | "?" | "/" | "|" | "\" | "'" | '"' ;
-$CHARACTER      =  $LETTER | $DIGIT | $SYMBOL ;
-*/
 
 static Token lexer_lex_nonterminal_identifier(Lexer *l);
 static Token lexer_lex_terminal_identifier(Lexer *l);
 static Token lexer_lex_operator(Lexer *l);
 static Token lexer_lex_literal(Lexer *l);
-//static Token lexer_lex_comment(Lexer *l);
 
 utf8_int32_t lexer_advance(Lexer *l) {
 	utf8_int32_t result = '\0';
@@ -42,6 +25,8 @@ utf8_int32_t lexer_advance(Lexer *l) {
 		if(result == '\n') {
 			l->pos.row += 1;
 			l->pos.col = 1;
+		} else {
+			l->pos.col += 1;
 		}
 
 		l->cc = result;
@@ -85,17 +70,8 @@ Token lexer_lex(Lexer *l) {
 	};
 	utf8_int32_t c = lexer_advance(l);
 
-	if(isascii(c) && isspace(c)) {
-		result = (Token) {
-			.lexeme = " ",
-			.type = TokenType_Whitespace,
-			.pos = {
-				.row = l->pos.row,
-				.col = l->pos.col,
-			},
-		};
-
-		return result;
+	while(isascii(c) && isspace(c)) {
+		c = lexer_advance(l);
 	}
 
 	if(lexer_at_end(l)) {
@@ -190,38 +166,47 @@ static Token lexer_lex_operator(Lexer *l) {
 			.col = l->pos.col,
 		},
 	};
-        utf8_int32_t peeked = lexer_peek_character(l);
 
         switch(lexer_current_character(l)) {
         case '=':
 		result.lexeme = "=";
+		result.type = TokenType_Equal;
                 break;
 	case '|':
 		result.lexeme = "|";
+		result.type = TokenType_Pipe;
 		break;
 	case '[':
 		result.lexeme = "[";
+		result.type = TokenType_LeftBracket;
 		break;
 	case ']':
 		result.lexeme = "]";
+		result.type = TokenType_RightBracket;
 		break;
 	case '{':
 		result.lexeme = "{";
+		result.type = TokenType_LeftBrace;
 		break;
 	case '}':
 		result.lexeme = "}";
+		result.type = TokenType_RightBrace;
 		break;
 	case '(':
 		result.lexeme = "(";
+		result.type = TokenType_LeftParenthesis;
 		break;
 	case ')':
 		result.lexeme = ")";
+		result.type = TokenType_RightParenthesis;
 		break;
 	case ',':
 		result.lexeme = ",";
+		result.type = TokenType_Comma;
 		break;
 	case ';':
 		result.lexeme = ";";
+		result.type = TokenType_Semicolon;
 		break;
         }
 

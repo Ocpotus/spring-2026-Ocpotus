@@ -46,7 +46,7 @@ typedef enum TokenType {
 	TokenType_RightParenthesis, // )
 	TokenType_LeftComment, // (*
 	TokenType_RightComment, // *)
-	TokenType_RuleDeclarationEnd, // ;
+	TokenType_Semicolon, // ;
 } TokenType;
 
 /* Token

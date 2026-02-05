@@ -1,13 +1,13 @@
 #include <stdio.h>
 
-#include "verbum/lexer/lexer.h"
-#include "verbum/token/token.h"
+#include "verbum/parser/parser.h"
 
 
 int main() {
-	Lexer *l = lexer_new("ebnf.ebnf");
-	Token t = { 0 };
+	Parser *p = parser_new("ebnf.ebnf");
+	Grammar g = parser_parse(p);
 
+/*
 	do {
 		t = lexer_get_token(l);
 
@@ -21,9 +21,9 @@ int main() {
 			token_delete(t);
 		}
 	} while(t.type != TokenType_EOF);
-
-	lexer_delete(l);
-	printf("Hello world!\n");
+*/
+	parser_delete(p);
+	ast_delete(g);
 
 	return 0;
 }

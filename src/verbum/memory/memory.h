@@ -32,5 +32,16 @@ void memory_delete(void *ptr);
  */
 void *memory_resize(void *ptr, size_t size);
 
+/* Memory copier
+ *
+ * PARAMETERS:
+ * 	data: memory to copy
+ * 	size: nbytes to copy
+ *
+ * RETURNS:
+ * 	A pointer to the allocated memory or NULL on failure
+ */
+void *memory_copy(void *data, size_t size);
+
 
 #endif

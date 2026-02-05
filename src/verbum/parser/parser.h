@@ -1,6 +1,8 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "../ast/ast.h"
+
 
 /* Opaque declaration */
 typedef struct Parser Parser;
@@ -32,6 +34,7 @@ void parser_delete(Parser *p);
  * 	A pointer to a Unit representing the parsed
  * 	file passed in with the path in parser_new
  */
+Grammar parser_parse(Parser *p);
 
 
 #endif

@@ -6,6 +6,7 @@
 
 #include "../../token/token.h"
 #include "../../lexer/lexer.h"
+#include "../../ast/ast.h"
 
 
 /* Parser struct
@@ -128,6 +129,8 @@ const char *parser_set_error(Parser *p, const char *error);
 void parser_reset_error(Parser *p);
 
 bool parser_errored(Parser *p);
+
+Grammar parser_parse_internal(Parser *p);
 
 
 #endif

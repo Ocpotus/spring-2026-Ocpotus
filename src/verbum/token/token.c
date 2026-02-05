@@ -4,5 +4,9 @@
 
 
 void token_delete(Token t) {
-	memory_delete((void *)t.lexeme);
+	if(t.type == TokenType_Literal ||
+	   t.type == TokenType_NonTerminal_Identifier ||
+	   t.type == TokenType_Terminal_Identifier) {
+		memory_delete((void *)t.lexeme);
+	}
 }

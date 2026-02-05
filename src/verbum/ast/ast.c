@@ -1,0 +1,164 @@
+#include "../../lib/c-vector/cvector.h"
+#include "../../lib/c-vector/cvector_utils.h"
+
+#include "../memory/memory.h"
+
+#include "ast.h"
+
+
+static void ast_delete_grammar(Grammar g1);
+static void ast_delete_rule(Rule r1);
+static void ast_delete_expression(Expression e1);
+static void ast_delete_list(List l1);
+static void ast_delete_term(Term t1);
+static void ast_delete_factor(Factor f1);
+
+
+Factor ast_new_factor1(Token t) {
+	return (Factor) {
+		.nonterminal_identifier = t,
+		.tag = FactorType_NonTerminal_Identifier,
+	};
+}
+
+Factor ast_new_factor2(Token t) {
+	return (Factor) {
+		.terminal_identifier = t,
+		.tag = FactorType_Terminal_Identifier,
+	};
+}
+
+Factor ast_new_factor3(Token t) {
+	return (Factor) {
+		.literal = t,
+		.tag = FactorType_Literal,
+	};
+}
+
+Factor ast_new_factor4(Expression e) {
+	return (Factor) {
+		.optional = memory_copy(&e, sizeof(e)),
+		.tag = FactorType_Optional,
+	};
+}
+
+Factor ast_new_factor5(Expression e) {
+	return (Factor) {
+		.repetition = memory_copy(&e, sizeof(e)),
+		.tag = FactorType_Repetition,
+	};
+}
+
+Factor ast_new_factor6(Expression e) {
+	return (Factor) {
+		.grouping = memory_copy(&e, sizeof(e)),
+		.tag = FactorType_Grouping,
+	};
+}
+
+
+Term ast_new_term(Factor f1, cvector(Factor) f2) {
+	return (Term) {
+		.factor1 = f1,
+		.factor2 = f2,
+	};
+}
+
+List ast_new_list(Term t1, cvector(Term) t2) {
+	return (List) {
+		.term1 = t1,
+		.term2 = t2,
+	};
+}
+
+Expression ast_new_expression(List l1, cvector(List) l2) {
+	return (Expression) {
+		.list1 = l1,
+		.list2 = l2,
+	};
+}
+
+Rule ast_new_rule(Token t1, Expression e1) {
+	return (Rule) {
+		.token1 = t1,
+		.expression1 = memory_copy(&e1, sizeof(e1)),
+	};
+}
+
+Grammar ast_new_grammar(cvector(Rule) r1) {
+	return (Grammar) {
+		.rule1 = r1,
+	};
+}
+
+void ast_delete(Grammar g1) {
+	ast_delete_grammar(g1);
+}
+
+static void ast_delete_grammar(Grammar g1) {
+	cvector_for_each(g1.rule1, ast_delete_rule);
+	cvector_free(g1.rule1);
+}
+
+static void ast_delete_rule(Rule r1) {
+	token_delete(r1.token1);
+	if(r1.expression1 != NULL) {
+		printf("null\n");
+		ast_delete_expression(*(r1.expression1));
+
+	}
+
+	memory_delete(r1.expression1);
+}
+
+static void ast_delete_expression(Expression e1) {
+	ast_delete_list(e1.list1);
+	cvector_for_each(e1.list2, ast_delete_list);
+	cvector_free(e1.list2);
+}
+
+static void ast_delete_list(List l1) {
+	ast_delete_term(l1.term1);
+	cvector_for_each(l1.term2, ast_delete_term);
+	cvector_free(l1.term2);
+}
+
+static void ast_delete_term(Term t1) {
+	ast_delete_factor(t1.factor1);
+	cvector_for_each(t1.factor2, ast_delete_factor);
+	cvector_free(t1.factor2);
+}
+
+static void ast_delete_factor(Factor f1) {
+	switch(f1.tag) {
+	case FactorType_NonTerminal_Identifier:
+		printf("ljasdflkj\n");
+		token_delete(f1.nonterminal_identifier);
+		break;
+	case FactorType_Terminal_Identifier:
+		printf("ljasdflkj\n");
+		token_delete(f1.terminal_identifier);
+		break;
+	case FactorType_Literal:
+		printf("ljasdflkj\n");
+		token_delete(f1.literal);
+		break;
+	case FactorType_Optional:
+		ast_delete_expression(*(f1.optional));
+		memory_delete(f1.optional);
+		printf("del expr\n");
+		break;
+	case FactorType_Repetition:
+		ast_delete_expression(*(f1.grouping));
+		memory_delete(f1.grouping);
+		printf("del expr\n");
+		break;
+	case FactorType_Grouping:
+		ast_delete_expression(*(f1.grouping));
+		memory_delete(f1.grouping);
+		printf("del expr\n");
+		break;
+	default:
+		break;
+	}
+}
