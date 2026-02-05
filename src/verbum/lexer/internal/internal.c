@@ -208,6 +208,10 @@ static Token lexer_lex_operator(Lexer *l) {
 		result.lexeme = ";";
 		result.type = TokenType_Semicolon;
 		break;
+	case '-':
+		result.lexeme = "-";
+		result.type = TokenType_Hyphen;
+		break;
         }
 
         return result;

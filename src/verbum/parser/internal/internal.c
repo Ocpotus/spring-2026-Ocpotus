@@ -137,13 +137,11 @@ static Rule parser_parse_rule(Parser *p) {
 		}
 
 		Rule r = { .token1 = t1, .expression1 = memory_copy(&e1, sizeof(e1))};
-		/* return (Rule) {
-			.token1 = t1,
-			.expression1 = memory_copy(&e1, sizeof(e1)),
-		}; */
+
 		if(r.expression1 == NULL) {
-			printf("e is null\n");
+			return (Rule) { 0 };
 		}
+
 		return r;
 	}
 	

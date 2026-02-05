@@ -102,10 +102,9 @@ static void ast_delete_grammar(Grammar g1) {
 
 static void ast_delete_rule(Rule r1) {
 	token_delete(r1.token1);
-	if(r1.expression1 != NULL) {
-		printf("null\n");
-		ast_delete_expression(*(r1.expression1));
 
+	if(r1.expression1 != NULL) {
+		ast_delete_expression(*(r1.expression1));
 	}
 
 	memory_delete(r1.expression1);
@@ -113,50 +112,51 @@ static void ast_delete_rule(Rule r1) {
 
 static void ast_delete_expression(Expression e1) {
 	ast_delete_list(e1.list1);
-	cvector_for_each(e1.list2, ast_delete_list);
-	cvector_free(e1.list2);
+
+	if(e1.list2 != NULL) {
+		cvector_free_each_and_free(e1.list2, ast_delete_list);
+	}
 }
 
 static void ast_delete_list(List l1) {
 	ast_delete_term(l1.term1);
-	cvector_for_each(l1.term2, ast_delete_term);
-	cvector_free(l1.term2);
+
+	if(l1.term2 != NULL) {
+		cvector_free_each_and_free(l1.term2, ast_delete_term);
+	}
 }
 
 static void ast_delete_term(Term t1) {
 	ast_delete_factor(t1.factor1);
-	cvector_for_each(t1.factor2, ast_delete_factor);
-	cvector_free(t1.factor2);
+
+	if(t1.factor2 != NULL) {
+		ast_delete_factor(*(t1.factor2));
+		memory_delete(t1.factor2);
+	}
 }
 
 static void ast_delete_factor(Factor f1) {
 	switch(f1.tag) {
 	case FactorType_NonTerminal_Identifier:
-		printf("ljasdflkj\n");
 		token_delete(f1.nonterminal_identifier);
 		break;
 	case FactorType_Terminal_Identifier:
-		printf("ljasdflkj\n");
 		token_delete(f1.terminal_identifier);
 		break;
 	case FactorType_Literal:
-		printf("ljasdflkj\n");
 		token_delete(f1.literal);
 		break;
 	case FactorType_Optional:
 		ast_delete_expression(*(f1.optional));
 		memory_delete(f1.optional);
-		printf("del expr\n");
 		break;
 	case FactorType_Repetition:
 		ast_delete_expression(*(f1.grouping));
 		memory_delete(f1.grouping);
-		printf("del expr\n");
 		break;
 	case FactorType_Grouping:
 		ast_delete_expression(*(f1.grouping));
 		memory_delete(f1.grouping);
-		printf("del expr\n");
 		break;
 	default:
 		break;

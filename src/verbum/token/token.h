@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Operator charset */
-#define OPERATOR_CHARS "=|[]{}(),;"
+#define OPERATOR_CHARS "=|[]{}(),;-"
 /* Invalid charset */
 #define INVALID_CHARS "?&^!+/%~.<>"
 /* Whitespace charset */
