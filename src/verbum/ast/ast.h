@@ -75,5 +75,7 @@ Grammar ast_new_grammar(cvector(Rule) r1);
 
 void ast_delete(Grammar g1);
 
+void ast_print(Grammar g1);
+
 
 #endif

@@ -249,7 +249,7 @@ static Factor parser_parse_factor(Parser *p) {
 		Expression e = parser_parse_expression(p);
 
 		if(parser_match(p, TokenType_RightBrace)) {
-			return ast_new_factor4(e);
+			return ast_new_factor5(e);
 		} else {
 			return (Factor) { 0 };
 		}
@@ -259,7 +259,7 @@ static Factor parser_parse_factor(Parser *p) {
 		Expression e = parser_parse_expression(p);
 
 		if(parser_match(p, TokenType_RightParenthesis)) {
-			return ast_new_factor4(e);
+			return ast_new_factor6(e);
 
 		} else {
 			return (Factor) { 0 };

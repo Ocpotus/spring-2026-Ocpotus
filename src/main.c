@@ -7,6 +7,8 @@ int main() {
 	Parser *p = parser_new("ebnf.ebnf");
 	Grammar g = parser_parse(p);
 
+	ast_print(g);
+
 /*
 	do {
 		t = lexer_get_token(l);

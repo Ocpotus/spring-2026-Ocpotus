@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "../../lib/c-vector/cvector.h"
 #include "../../lib/c-vector/cvector_utils.h"
 
@@ -157,6 +159,90 @@ static void ast_delete_factor(Factor f1) {
 	case FactorType_Grouping:
 		ast_delete_expression(*(f1.grouping));
 		memory_delete(f1.grouping);
+		break;
+	default:
+		break;
+	}
+}
+
+static void ast_print_grammar(Grammar g1);
+static void ast_print_rule(Rule r1);
+static void ast_print_expression(Expression e1);
+static void ast_print_list(List l1);
+static void ast_print_term(Term t1);
+static void ast_print_factor(Factor f1);
+
+void ast_print(Grammar g1) {
+	ast_print_grammar(g1);
+}
+
+static void ast_print_grammar(Grammar g1) {
+	cvector_for_each(g1.rule1, ast_print_rule);
+}
+
+static void ast_print_rule(Rule r1) {
+	printf("%s", r1.token1.lexeme);
+	printf("\t=");
+	ast_print_expression(*(r1.expression1));
+	printf(";\n");
+}
+
+static void ast_print_expression(Expression e1) {
+	ast_print_list(e1.list1);
+
+	if(e1.list2 != NULL) {
+		for(List *it = cvector_begin(e1.list2); it != cvector_end(e1.list2); it += 1) {
+			printf("|");
+			ast_print_list(*it);
+		}
+	}
+}
+
+static void ast_print_list(List l1) {
+	ast_print_term(l1.term1);
+
+	if(l1.term2 != NULL) {
+		for(Term *it = cvector_begin(l1.term2); it != cvector_end(l1.term2); it += 1) {
+			printf(",");
+			ast_print_term(*it);
+		}
+	}
+}
+
+static void ast_print_term(Term t1) {
+	ast_print_factor(t1.factor1);
+
+	if(t1.factor2 != NULL) {
+		printf("-");
+		ast_print_factor(*t1.factor2);
+	}
+}
+
+static void ast_print_factor(Factor f1) {
+	switch(f1.tag) {
+	case FactorType_NonTerminal_Identifier:
+		printf(" %s ", f1.nonterminal_identifier.lexeme);
+		break;
+	case FactorType_Terminal_Identifier:
+		printf(" $%s ", f1.terminal_identifier.lexeme);
+		break;
+	case FactorType_Literal:
+		printf(" \"%s\" ", f1.literal.lexeme);
+		break;
+	case FactorType_Optional:
+		printf(" [ ");
+		ast_print_expression(*(f1.optional));
+		printf(" ] ");
+		break;
+	case FactorType_Repetition:
+		printf(" { ");
+		ast_print_expression(*(f1.grouping));
+		printf(" } ");
+		break;
+	case FactorType_Grouping:
+		printf(" ( ");
+		ast_print_expression(*(f1.grouping));
+		printf(" ) ");
 		break;
 	default:
 		break;

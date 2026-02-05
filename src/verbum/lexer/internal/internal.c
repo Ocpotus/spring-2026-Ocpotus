@@ -139,7 +139,7 @@ Token lexer_lex_terminal_identifier(Lexer *l) {
 Token lexer_lex_nonterminal_identifier(Lexer *l) {
 	Token result = {
 		.lexeme = NULL,
-		.type = TokenType_Terminal_Identifier,
+		.type = TokenType_NonTerminal_Identifier,
 		.pos = {
 			.row = l->pos.row,
 			.col = l->pos.col,
