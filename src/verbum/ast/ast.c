@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "../../lib/try.h/try.h"
 #include "../../lib/c-vector/cvector.h"
 #include "../../lib/c-vector/cvector_utils.h"
 
@@ -93,8 +94,16 @@ Grammar ast_new_grammar(cvector(Rule) r1) {
 	};
 }
 
-void ast_delete(Grammar g1) {
-	ast_delete_grammar(g1);
+void ast_delete(AST *ast) {
+	ast_delete_grammar(*ast);
+	memory_delete(ast);
+
+}
+
+AST *ast_new(Grammar g1) {
+	AST *result = try(memory_copy(&g1, sizeof(*result)), result == NULL, { return NULL; });
+
+	return result;
 }
 
 static void ast_delete_grammar(Grammar g1) {
@@ -172,8 +181,8 @@ static void ast_print_list(List l1);
 static void ast_print_term(Term t1);
 static void ast_print_factor(Factor f1);
 
-void ast_print(Grammar g1) {
-	ast_print_grammar(g1);
+void ast_print(AST *ast) {
+	ast_print_grammar(*ast);
 }
 
 static void ast_print_grammar(Grammar g1) {
@@ -181,7 +190,7 @@ static void ast_print_grammar(Grammar g1) {
 }
 
 static void ast_print_rule(Rule r1) {
-	printf("%s", r1.token1.lexeme);
+	printf("%c%s", r1.token1.type == TokenType_Terminal_Identifier ? '$' : '\0',r1.token1.lexeme);
 	printf("\t=");
 	ast_print_expression(*(r1.expression1));
 	printf(";\n");

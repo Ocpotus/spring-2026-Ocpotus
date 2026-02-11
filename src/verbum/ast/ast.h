@@ -73,9 +73,11 @@ Expression ast_new_expression(List l1, cvector(List) l2);
 Rule ast_new_rule(Token t1, Expression e1);
 Grammar ast_new_grammar(cvector(Rule) r1);
 
-void ast_delete(Grammar g1);
+typedef Grammar AST;
 
-void ast_print(Grammar g1);
+AST *ast_new(Grammar g1);
+void ast_delete(AST *ast);
+void ast_print(AST *ast);
 
 
 #endif
