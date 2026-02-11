@@ -34,7 +34,7 @@ void parser_delete(Parser *p);
  * 	A pointer to a Unit representing the parsed
  * 	file passed in with the path in parser_new
  */
-Grammar parser_parse(Parser *p);
+AST *parser_parse(Parser *p);
 
 
 #endif

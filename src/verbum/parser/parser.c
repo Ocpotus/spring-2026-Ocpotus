@@ -1,3 +1,5 @@
+#include "../../lib/try.h/try.h"
+
 #include "../ast/ast.h"
 #include "../lexer/lexer.h"
 #include "../memory/memory.h"
@@ -28,6 +30,9 @@ void parser_delete(Parser *p) {
 	memory_delete(p);
 }
 
-Grammar parser_parse(Parser *p) {
-	return parser_parse_internal(p);
+AST *parser_parse(Parser *p) {
+	Grammar g1 = parser_parse_internal(p);
+	AST *result = try(memory_copy(&g1, sizeof(*result)), result == NULL, { return NULL; });
+
+	return result;
 }

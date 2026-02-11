@@ -121,6 +121,7 @@ static Rule parser_parse_rule(Parser *p) {
 	if(parser_match_any(p, tts, sizeof(tts) / sizeof(*tts))) {
 		Token t1 = parser_previous(p);
 		Expression e1 = { 0 };
+		Rule r = { 0 };
 
 		if(!parser_match(p, TokenType_Equal)) {
 			return (Rule) { 0 };
@@ -136,7 +137,10 @@ static Rule parser_parse_rule(Parser *p) {
 			return (Rule) { 0 };
 		}
 
-		Rule r = { .token1 = t1, .expression1 = memory_copy(&e1, sizeof(e1))};
+		r = (Rule) {
+			.token1 = t1,
+			.expression1 = memory_copy(&e1, sizeof(e1))
+		};
 
 		if(r.expression1 == NULL) {
 			return (Rule) { 0 };
