@@ -1,5 +1,5 @@
-#ifndef PARSER_INTERNAL_H
-#define PARSER_INTERNAL_H
+#ifndef VERBUM_PARSER_INTERNAL_H
+#define VERBUM_PARSER_INTERNAL_H
 
 #include <stdlib.h>
 #include <stdbool.h>

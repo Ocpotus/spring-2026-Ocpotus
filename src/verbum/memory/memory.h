@@ -1,5 +1,5 @@
-#ifndef C_MEMORY_H
-#define C_MEMORY_H
+#ifndef VERBUM_MEMORY_H
+#define VERBUM_MEMORY_H
 
 #include <stdlib.h>
 

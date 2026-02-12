@@ -1,5 +1,5 @@
-#ifndef LEXER_INTERNAL_H
-#define LEXER_INTERNAL_H
+#ifndef VERBUM_LEXER_INTERNAL_H
+#define VERBUM_LEXER_INTERNAL_H
 
 #include <stdbool.h>
 

@@ -212,6 +212,9 @@ static Token lexer_lex_operator(Lexer *l) {
 		result.lexeme = "-";
 		result.type = TokenType_Hyphen;
 		break;
+	default:
+		result.type = TokenType_Invalid;
+		break;
         }
 
         return result;
