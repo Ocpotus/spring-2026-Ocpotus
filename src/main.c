@@ -11,15 +11,47 @@
 int main() {
 	Parser *p = parser_new("ebnf.ebnf");
 	AST *ast = parser_parse(p);
-	EBNFAnalyzer *ea = analysis_new_ebnf_analyzer();
+	Analyzer *a = analyzer_new(ast);
 
-	analysis_ebnf_analyze(ast, ea);
+	analyzer_analyze(a);
 
-	//code_generate_token(ts);
-	analyze_delete_ebnf_analyzer(ea);
-	ast_print(ast);
-	parser_delete(p);
+	/* {
+		void *item;
+		size_t i = 0;
+		size_t n = 0;
+
+		while(hashmap_iter(a->tokens, &i, &item)) {
+			Token *t = item;
+
+			printf("%s\n", t->lexeme);
+			n += 1;
+		}
+	} */
+	{
+		void *item;
+		size_t i = 0;
+
+		while(hashmap_iter(a->firsts, &i, &item)) {
+			FirstFollowSet *ffs = item;
+			void *item2;
+			size_t j = 0;
+
+			printf("Key '%s': ", ffs->t.lexeme);
+
+			while(hashmap_iter(ffs->tokens, &j, &item2)) {
+				Token *t = item2;
+				printf("%s , ", t->lexeme);
+			}
+
+			printf("\n----------------------------------------\n");
+		}
+	}
+	
+
+	//ast_print(ast);
+	analyzer_delete(a);
 	ast_delete(ast);
+	parser_delete(p);
 
 	return 0;
 }

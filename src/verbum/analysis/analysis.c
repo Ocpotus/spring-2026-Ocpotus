@@ -4,7 +4,6 @@
 
 #include "../../lib/try.h/try.h"
 #include "../../lib/c-vector/cvector.h"
-#include "../../lib/uthash.h/uthash.h"
 #include "../../lib/hashmap.c/hashmap.h"
 
 #include "../memory/memory.h"
@@ -14,13 +13,37 @@
 #include "analysis.h"
 
 
+/* Token analysis */
+static bool analyzer_analyze_tokens(Analyzer *a);
+static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1);
+static void analyzer_analyze_tokens_rule(Analyzer *a, Rule r1);
+static void analyzer_analyze_tokens_expression(Analyzer *a, Expression e1);
+static void analyzer_analyze_tokens_list(Analyzer *a, List l1);
+static void analyzer_analyze_tokens_term(Analyzer *a, Term t1);
+static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1);
+/* First analysis */
+static void analyzer_analyze_firsts(Analyzer *a, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
+/* Follow analysis */
+static bool analyzer_analyze_follows(Analyzer *a);
 
+/* FirstFollow set utils */
+static FirstFollowSet first_follow_set_new();
+static void first_follow_set_delete(FirstFollowSet *ffs);
+
+/* Hash functions */
 static uint64_t token_hash(const void *item, uint64_t seed0, uint64_t seed1);
 static int token_compare(const void *a, const void *b, void *udata);
 static uint64_t rule_set_hash(const void *item, uint64_t seed0, uint64_t seed1);
 static int rule_set_compare(const void *a, const void *b, void *udata);
 
-
+/* Utils */
+static void set_union(struct hashmap *d, struct hashmap *s);
 
 Analyzer *analyzer_new(AST *ast) {
 	Analyzer *result = try(memory_new(1 * sizeof(*result)), result == NULL, { return NULL; });
@@ -31,268 +54,255 @@ Analyzer *analyzer_new(AST *ast) {
 			 token_hash, token_compare, NULL, NULL);
 	result->firsts = hashmap_new_with_allocator(
 			 memory_new, memory_resize, memory_delete,
-			 sizeof(RuleSet), 0, 0, 0,
+			 sizeof(FirstFollowSet), 0, 0, 0,
 			 rule_set_hash, rule_set_compare, NULL, NULL);
 	result->follows = hashmap_new_with_allocator(
 			  memory_new, memory_resize, memory_delete,
-			  sizeof(RuleSet), 0, 0, 0,
+			  sizeof(FirstFollowSet), 0, 0, 0,
 			  rule_set_hash, rule_set_compare, NULL, NULL);
 	result->ast = ast;
 
 	return result;
 }
 
-void analyzer_delete(Analyzer *ea) {
-	hashmap_free(ea->tokens);
-	hashmap_free(ea->firsts);
-	hashmap_free(ea->follows);
-	memory_delete(ea);
-}
+void analyzer_delete(Analyzer *a) {
+	hashmap_free(a->tokens);
 
-/*
-static void analysis_gather_tokens_grammar(Grammar g1, cvector(Token) *ts);
-static void analysis_gather_tokens_rule(Rule r1, cvector(Token) *ts);
-static void analysis_gather_tokens_expression(Expression e1, cvector(Token) *ts);
-static void analysis_gather_tokens_list(List l1, cvector(Token) *ts);
-static void analysis_gather_tokens_term(Term t1, cvector(Token) *ts);
-static void analysis_gather_tokens_factor(Factor f1, cvector(Token) *ts);
+	{
+		void *item;
+		size_t i = 0;
 
-cvector(Token) analysis_gather_tokens(AST *ast) {
-	cvector(Token) result = NULL;
-	analysis_gather_tokens_grammar(*ast, &result);
-	return result;
-}
+		while(hashmap_iter(a->firsts, &i, &item)) {
+			FirstFollowSet *ffs = item;
 
-static void analysis_gather_tokens_grammar(Grammar g1, cvector(Token) *ts) {
-	for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
-		analysis_gather_tokens_rule(*it, ts);
-	}
-}
-
-static void analysis_gather_tokens_rule(Rule r1, cvector(Token) *ts) {
-	bool found = false;
-
-	for(Token *it = cvector_begin(*ts); it != cvector_end(*ts); it += 1) {
-		if(strcmp(it->lexeme, r1.token1.lexeme) == 0) {
-			found = true;
-			break;
+			first_follow_set_delete(ffs);
 		}
+
+		hashmap_free(a->firsts);
 	}
 
-	if(!found) {
-		cvector_push_back(*ts, r1.token1);
-	}
-
-	analysis_gather_tokens_expression(*(r1.expression1), ts);
+	hashmap_free(a->follows);
+	memory_delete(a);
 }
 
-static void analysis_gather_tokens_expression(Expression e1, cvector(Token) *ts) {
-	analysis_gather_tokens_list(e1.list1, ts);
+void analyzer_analyze(Analyzer *a) {
+	analyzer_analyze_tokens(a);
+	analyzer_analyze_firsts(a, NULL);
+}
+
+static bool analyzer_analyze_tokens(Analyzer *a) {
+	analyzer_analyze_tokens_grammar(a, *(a->ast));
+
+	return true;
+}
+
+static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1) {
+	for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
+		analyzer_analyze_tokens_rule(a, *it);
+	}
+}
+
+static void analyzer_analyze_tokens_rule(Analyzer *a, Rule r1) {
+	if(hashmap_get(a->tokens, &r1.token1) == NULL) {
+		hashmap_set(a->tokens, &r1.token1);
+	}
+
+	analyzer_analyze_tokens_expression(a, *(r1.expression1));
+}
+
+static void analyzer_analyze_tokens_expression(Analyzer *a, Expression e1) {
+	analyzer_analyze_tokens_list(a, e1.list1);
 
 	for(List *it = cvector_begin(e1.list2); it != cvector_end(e1.list2); it += 1) {
-		analysis_gather_tokens_list(*it, ts);
+		analyzer_analyze_tokens_list(a, *it);
 	}
 }
 
-static void analysis_gather_tokens_list(List l1, cvector(Token) *ts) {
-	analysis_gather_tokens_term(l1.term1, ts);
+static void analyzer_analyze_tokens_list(Analyzer *a, List l1) {
+	analyzer_analyze_tokens_term(a, l1.term1);
 
 	for(Term *it = cvector_begin(l1.term2); it != cvector_end(l1.term2); it += 1) {
-		analysis_gather_tokens_term(*it, ts);
+		analyzer_analyze_tokens_term(a, *it);
 	}
 }
 
-static void analysis_gather_tokens_term(Term t1, cvector(Token) *ts) {
-	analysis_gather_tokens_factor(t1.factor1, ts);
+static void analyzer_analyze_tokens_term(Analyzer *a, Term t1) {
+	analyzer_analyze_tokens_factor(a, t1.factor1);
 
 	if(t1.factor2 != NULL) {
-		analysis_gather_tokens_factor(*(t1.factor2), ts);
+		analyzer_analyze_tokens_factor(a, *(t1.factor2));
 	}
 }
 
-static void analysis_gather_tokens_factor(Factor f1, cvector(Token) *ts) {
+static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1) {
 	switch(f1.tag) {
 	case FactorType_NonTerminal_Identifier:
 	case FactorType_Terminal_Identifier:
 	case FactorType_Literal:
-		bool found = false;
-
-		for(Token *it = cvector_begin(*ts); it != cvector_end(*ts); it += 1) {
-			if(strcmp(it->lexeme, f1.literal.lexeme) == 0) {
-				found = true;
-				break;
-			}
-		}
-
-		if(!found) {
-			cvector_push_back(*ts, f1.literal);
+		if(hashmap_get(a->tokens, &f1.literal) == NULL) {
+			hashmap_set(a->tokens, &f1.literal);
 		}
 		break;
 	case FactorType_Optional:
 	case FactorType_Repetition:
 	case FactorType_Grouping:
-		analysis_gather_tokens_expression(*(f1.repetition), ts);
+		analyzer_analyze_tokens_expression(a, *(f1.repetition));
 		break;
 	default:
 		break;
 	}
 }
-*/
-/*
-static bool analysis_gather_first_grammar(Grammar g1, FirstFollowSet **ffs);
-static bool analysis_gather_first_rule(Rule rule, FirstFollowSet **ffs);
-static bool analysis_gather_first_expression(Expression e1, FirstFollowSet **ffs);
-static bool analysis_gather_first_list(List l1, FirstFollowSet **ffs);
-static bool analysis_gather_first_term(Term t1, FirstFollowSet **ffs);
-static bool analysis_gather_first_factor(Factor f1, FirstFollowSet **ffs);
 
-FirstFollowSet *analysis_gather_first(AST *ast) {
-	FirstFollowSet *result = NULL;
-	analysis_gather_first_grammar(*ast, &result);
-	return result;
+static void analyzer_analyze_firsts(Analyzer *a, FirstFollowSet *ffs) {
+	analyzer_analyze_firsts_grammar(a, *(a->ast), NULL);
 }
 
-// Return true iff nullable, else false
-static bool analysis_gather_first_grammar(Grammar g1, FirstFollowSet **ffs) {
+static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs) {
 	bool changed = true;
 
 	while(changed) {
 		changed = false;
 
-		for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
-			if(it->token1.type != TokenType_Terminal_Identifier) {
-				// Gather first and follow for 
-				changed = analysis_gather_first_rule(*it, ffs);
+		for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
+			const FirstFollowSet *ffsp = hashmap_get(a->firsts, &(FirstFollowSet) { .t = it->token1 });
+			FirstFollowSet ffs;
+
+			if(ffsp == NULL) {
+				ffs = first_follow_set_new();
+				ffs.t = it->token1;
+			} else {
+				ffs = *ffsp;
+			}
+
+			size_t oldcount = hashmap_count(ffs.tokens);
+
+			analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
+
+			if(hashmap_count(ffs.tokens) > oldcount) {
+				changed = true;
+				hashmap_set(a->firsts, &ffs);
 			}
 		}
 	}
-
-	return true;
 }
 
-static bool analysis_gather_first_rule(Rule rule, FirstFollowSet **ffs) {
-	FirstFollowSet *rule_set = try(memory_new(1 * sizeof(*rule_set)), rule_set == NULL, { return false; });
-	cvector(Token) first = NULL;
-	cvector(Token) follow = NULL;
+static void analyzer_analyze_firsts_expression(Analyzer *a, Expression e, FirstFollowSet *ffs) {
+	analyzer_analyze_firsts_list(a, e.list1, ffs);
 
-	rule_set->first = first;
-	rule_set->token_name = rule.token1.lexeme;
-	analysis_gather_first_expression(*(rule.expression1), ffs);
-
-	HASH_ADD_KEYPTR(hh, *ffs, rule.token1.lexeme, strlen(rule.token1.lexeme), rule_set);
-
-	return true;
+	for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
+		analyzer_analyze_firsts_list(a, *it, ffs);
+	}
 }
 
-static bool analysis_gather_first_expression(Expression e1, FirstFollowSet **ffs) {
-	bool nullable = analysis_gather_first_list(e1.list1, ffs);
-}
+static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ffs) {
+	FirstFollowSet temp = first_follow_set_new();
 
-static bool analysis_gather_first_list(List l1, FirstFollowSet **ffs) {
-	bool nullable = analysis_gather_first_term(l1.term1, ffs);
+	ffs->nullable = temp.nullable;
+	analyzer_analyze_firsts_term(a, l.term1, &temp);
+	set_union(ffs->tokens, temp.tokens);
+	first_follow_set_delete(&temp);
 
-	for(Term *it = cvector_begin(l1.term2); it != cvector_end(l1.term2); it += 1) {
-		if(!analysis_gather_first_term(*it, ffs)) {
-			nullable = false;
+	for(Term *it = cvector_begin(l.term2); ffs->nullable && it != cvector_end(l.term2); it += 1) {
+		temp = first_follow_set_new();
+		analyzer_analyze_firsts_term(a, *it, &temp);
+		set_union(ffs->tokens, temp.tokens);
+		
+		if(temp.nullable == false) {
+			ffs->nullable = false;
+			first_follow_set_delete(&temp);
+
+			break;
 		}
-	}
 
-	return nullable;
+		first_follow_set_delete(&temp);
+	}
 }
 
-static bool analysis_gather_first_term(Term t1, FirstFollowSet **ffs);
-static bool analysis_gather_first_factor(Factor f1, FirstFollowSet **ffs) {
-	switch(f1.tag) {
+static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ffs) {
+	FirstFollowSet f1 = first_follow_set_new();
+
+	analyzer_analyze_firsts_factor(a, t.factor1, &f1);
+
+	if(t.factor2 != NULL) {
+		FirstFollowSet f2 = first_follow_set_new();
+		void *item;
+		size_t i = 0;
+
+		analyzer_analyze_firsts_factor(a, *t.factor2, &f2);
+
+		while(hashmap_iter(f2.tokens, &i, &item)) {
+			hashmap_delete(f1.tokens, item);
+		}
+
+		if(f2.nullable) {
+			f1.nullable = false;
+		}
+
+		first_follow_set_delete(&f2);
+	}
+
+	set_union(ffs->tokens, f1.tokens);
+	ffs->nullable = f1.nullable;
+	first_follow_set_delete(&f1);
+}
+
+static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet *ffs) {
+	switch(f.tag) {
 	case FactorType_Terminal_Identifier:
-		// nullable, false
-		break;
-	case FactorType_NonTerminal_Identifier:
+		hashmap_set(ffs->tokens, &f.terminal_identifier);
+		ffs->nullable = false;
 		break;
 	case FactorType_Literal:
-		// nullable, false
+		hashmap_set(ffs->tokens, &f.literal);
+		ffs->nullable = false;
 		break;
-	case FactorType_Optional:
-		// nullable, true
-		break;
-	case FactorType_Repetition:
-		// nullable, true
-		break;
-	case FactorType_Grouping:
-		break;
-	default:
-		break;
-	}
-	return true;
-}
-*/
-static void analysis_ebnf_analyze_tokens_grammar(Grammar g1, EBNFAnalyzer *ea);
-static void analysis_ebnf_analyze_tokens_rule(Rule r1, EBNFAnalyzer *ea);
-static void analysis_ebnf_analyze_tokens_expression(Expression e1, EBNFAnalyzer *ea);
-static void analysis_ebnf_analyze_tokens_list(List l1, EBNFAnalyzer *ea);
-static void analysis_ebnf_analyze_tokens_term(Term t1, EBNFAnalyzer *ea);
-static void analysis_ebnf_analyze_tokens_factor(Factor f1, EBNFAnalyzer *ea);
+	case FactorType_NonTerminal_Identifier: {
+			const FirstFollowSet *nonterm_set = hashmap_get(a->firsts,
+									&(FirstFollowSet) { .t = f.nonterminal_identifier });
 
-void analysis_ebnf_analyze(AST *ast, EBNFAnalyzer *ea) {
-	analysis_ebnf_analyze_tokens_grammar(*ast, ea);
-}
-
-static void analysis_ebnf_analyze_tokens_grammar(Grammar g1, EBNFAnalyzer *ea) {
-	for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
-		analysis_ebnf_analyze_tokens_rule(*it, ea);
-	}
-}
-
-static void analysis_ebnf_analyze_tokens_rule(Rule r1, EBNFAnalyzer *ea) {
-	if(hashmap_get(ea->tokens, &r1.token1) == NULL) {
-		hashmap_set(ea->tokens, &r1.token1);
-	}
-
-	analysis_ebnf_analyze_tokens_expression(*(r1.expression1), ea);
-}
-
-static void analysis_ebnf_analyze_tokens_expression(Expression e1, EBNFAnalyzer *ea) {
-	analysis_ebnf_analyze_tokens_list(e1.list1, ea);
-
-	for(List *it = cvector_begin(e1.list2); it != cvector_end(e1.list2); it += 1) {
-		analysis_ebnf_analyze_tokens_list(*it, ea);
-	}
-}
-
-static void analysis_ebnf_analyze_tokens_list(List l1, EBNFAnalyzer *ea) {
-	analysis_ebnf_analyze_tokens_term(l1.term1, ea);
-
-	for(Term *it = cvector_begin(l1.term2); it != cvector_end(l1.term2); it += 1) {
-		analysis_ebnf_analyze_tokens_term(*it, ea);
-	}
-}
-
-static void analysis_ebnf_analyze_tokens_term(Term t1, EBNFAnalyzer *ea) {
-	analysis_ebnf_analyze_tokens_factor(t1.factor1, ea);
-
-	if(t1.factor2 != NULL) {
-		analysis_ebnf_analyze_tokens_factor(*(t1.factor2), ea);
-	}
-}
-
-static void analysis_ebnf_analyze_tokens_factor(Factor f1, EBNFAnalyzer *ea) {
-	switch(f1.tag) {
-	case FactorType_NonTerminal_Identifier:
-	case FactorType_Terminal_Identifier:
-	case FactorType_Literal:
-		if(hashmap_get(ea->tokens, &f1.literal) == NULL) {
-			hashmap_set(ea->tokens, &f1.literal);
+			if(nonterm_set != NULL) {
+				set_union(ffs->tokens, nonterm_set->tokens);
+				ffs->nullable = nonterm_set->nullable;
+			}
 		}
 		break;
 	case FactorType_Optional:
+		analyzer_analyze_firsts_expression(a, *f.optional, ffs);
+		ffs->nullable = true;
+		break;
 	case FactorType_Repetition:
+		analyzer_analyze_firsts_expression(a, *f.repetition, ffs);
+		ffs->nullable = true;
+		break;
 	case FactorType_Grouping:
-		analysis_ebnf_analyze_tokens_expression(*(f1.repetition), ea);
+		analyzer_analyze_firsts_expression(a, *f.grouping, ffs);
 		break;
 	default:
 		break;
 	}
 }
 
+static FirstFollowSet first_follow_set_new() {
+	return (FirstFollowSet) {
+		.nullable = false,
+		.t = (Token) { 0 },
+		.tokens = hashmap_new_with_allocator(
+			  memory_new, memory_resize, memory_delete,
+			  sizeof(Token), 0, 0, 0,
+			  token_hash, token_compare, NULL, NULL),
+	};
+}
+
+static void first_follow_set_delete(FirstFollowSet *ffs) {
+	hashmap_free(ffs->tokens);
+	*ffs = (FirstFollowSet) {
+		.nullable = false,
+		.t = (Token) { 0 },
+		.tokens = NULL,
+	};
+}
+
+/* Hashmap functions */
 static uint64_t token_hash(const void *item, uint64_t seed0, uint64_t seed1) {
 	const Token *token = item;
 
@@ -311,14 +321,23 @@ static int token_compare(const void *a, const void *b, void *udata) {
 }
 
 static uint64_t rule_set_hash(const void *item, uint64_t seed0, uint64_t seed1) {
-	const RuleSet *ruleset = item;
+	const FirstFollowSet *set = item;
 
-	return hashmap_sip(ruleset->rule->token1.lexeme, strlen(ruleset->rule->token1.lexeme), seed0, seed1);
+	return hashmap_sip(set->t.lexeme, strlen(set->t.lexeme), seed0, seed1);
 }
 
 static int rule_set_compare(const void *a, const void *b, void *udata) {
-	const RuleSet *ua = a;
-	const RuleSet *ub = b;
+	const FirstFollowSet *ua = a;
+	const FirstFollowSet *ub = b;
 
-	return strcmp(ua->rule->token1.lexeme, ub->rule->token1.lexeme);
+	return strcmp(ua->t.lexeme, ub->t.lexeme);
+}
+
+static void set_union(struct hashmap *d, struct hashmap *s) {
+	size_t i = 0;
+	void *item;
+
+	while(hashmap_iter(s, &i, &item)) {
+		hashmap_set(d, item);
+	}
 }
