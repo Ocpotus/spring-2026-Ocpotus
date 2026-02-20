@@ -30,7 +30,13 @@ static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ff
 static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ffs);
 static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
 /* Follow analysis */
-static bool analyzer_analyze_follows(Analyzer *a);
+static void analyzer_analyze_follows(Analyzer *a, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_list(Analyzer *a, List l, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
 
 /* FirstFollow set utils */
 static FirstFollowSet first_follow_set_new();
@@ -166,21 +172,29 @@ static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowS
 		for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
 			const FirstFollowSet *ffsp = hashmap_get(a->firsts, &(FirstFollowSet) { .t = it->token1 });
 			FirstFollowSet ffs;
+			size_t oldcount;
 
 			if(ffsp == NULL) {
 				ffs = first_follow_set_new();
 				ffs.t = it->token1;
+				oldcount = hashmap_count(ffs.tokens);
+				analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
+
+				if(hashmap_count(ffs.tokens) > oldcount) {
+					changed = true;
+					hashmap_set(a->firsts, &ffs);
+				} else {
+					first_follow_set_delete(&ffs);
+				}
 			} else {
 				ffs = *ffsp;
-			}
+				oldcount = hashmap_count(ffs.tokens);
+				analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
 
-			size_t oldcount = hashmap_count(ffs.tokens);
-
-			analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
-
-			if(hashmap_count(ffs.tokens) > oldcount) {
-				changed = true;
-				hashmap_set(a->firsts, &ffs);
+				if(hashmap_count(ffs.tokens) > oldcount) {
+					changed = true;
+					hashmap_set(a->firsts, &ffs);
+				}
 			}
 		}
 	}
@@ -281,6 +295,19 @@ static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet
 		break;
 	}
 }
+
+static void analyzer_analyze_follows(Analyzer *a, FirstFollowSet *ffs) {
+	analyzer_analyze_follows_grammar(a, *(a->ast), NULL);
+}
+
+static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs) {
+
+}
+static void analyzer_analyze_follows_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_list(Analyzer *a, List l, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *ffs);
+static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
 
 static FirstFollowSet first_follow_set_new() {
 	return (FirstFollowSet) {
