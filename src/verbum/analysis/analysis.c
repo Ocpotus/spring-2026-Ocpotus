@@ -94,6 +94,7 @@ void analyzer_delete(Analyzer *a) {
 void analyzer_analyze(Analyzer *a) {
 	analyzer_analyze_tokens(a);
 	analyzer_analyze_firsts(a, NULL);
+	analyzer_analyze_follows(a, NULL);
 }
 
 static bool analyzer_analyze_tokens(Analyzer *a) {
@@ -135,7 +136,7 @@ static void analyzer_analyze_tokens_list(Analyzer *a, List l1) {
 static void analyzer_analyze_tokens_term(Analyzer *a, Term t1) {
 	analyzer_analyze_tokens_factor(a, t1.factor1);
 
-	if(t1.factor2 != NULL) {
+	if(optional_is_valid(t1.factor2)) {
 		analyzer_analyze_tokens_factor(a, *(t1.factor2));
 	}
 }
@@ -211,8 +212,8 @@ static void analyzer_analyze_firsts_expression(Analyzer *a, Expression e, FirstF
 static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ffs) {
 	FirstFollowSet temp = first_follow_set_new();
 
-	ffs->nullable = temp.nullable;
 	analyzer_analyze_firsts_term(a, l.term1, &temp);
+	ffs->nullable = temp.nullable;
 	set_union(ffs->tokens, temp.tokens);
 	first_follow_set_delete(&temp);
 
@@ -237,7 +238,7 @@ static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ff
 
 	analyzer_analyze_firsts_factor(a, t.factor1, &f1);
 
-	if(t.factor2 != NULL) {
+	if(optional_is_valid(t.factor2)) {
 		FirstFollowSet f2 = first_follow_set_new();
 		void *item;
 		size_t i = 0;
@@ -301,13 +302,137 @@ static void analyzer_analyze_follows(Analyzer *a, FirstFollowSet *ffs) {
 }
 
 static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs) {
+	bool changed = true;
+
+	while(changed) {
+		changed = false;
+
+		for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
+			const FirstFollowSet *ffsp = hashmap_get(a->follows, &(FirstFollowSet) { .t = it->token1 });
+			FirstFollowSet ffs;
+			size_t oldcount;
+
+			if(ffsp == NULL) {
+				ffs = first_follow_set_new();
+				ffs.t = it->token1;
+				oldcount = hashmap_count(ffs.tokens);
+				analyzer_analyze_follows_expression(a, *(it->expression1), &ffs);
+
+				if(hashmap_count(ffs.tokens) > oldcount) {
+					changed = true;
+					hashmap_set(a->follows, &ffs);
+				} else {
+					first_follow_set_delete(&ffs);
+				}
+			} else {
+				ffs = *ffsp;
+				oldcount = hashmap_count(ffs.tokens);
+				analyzer_analyze_follows_expression(a, *(it->expression1), &ffs);
+
+				if(hashmap_count(ffs.tokens) > oldcount) {
+					changed = true;
+					hashmap_set(a->follows, &ffs);
+				}
+			}
+		}
+	}
 
 }
+
 static void analyzer_analyze_follows_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
-static void analyzer_analyze_follows_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
-static void analyzer_analyze_follows_list(Analyzer *a, List l, FirstFollowSet *ffs);
-static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *ffs);
-static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
+
+static void analyzer_analyze_follows_expression(Analyzer *a, Expression e, FirstFollowSet *ffs) {
+	analyzer_analyze_follows_list(a, e.list1, ffs);
+
+	for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
+		analyzer_analyze_follows_list(a, *it, ffs);
+	}
+}
+
+static void analyzer_analyze_follows_list(Analyzer *a, List l, FirstFollowSet *ffs) {
+	if(cvector_empty(l.term2)) {
+		analyzer_analyze_follows_term(a, l.term1, ffs);
+		return;
+	}
+
+	// This is an ease of use, simplifies the following algorithm
+	cvector(Term) tempTerms = NULL;
+	cvector_copy(l.term2, tempTerms); // may be able to just push to l.term2, then pop when done.
+	cvector_insert(tempTerms, 0, l.term1);
+
+	for(Term *it1 = cvector_begin(tempTerms); it1 != cvector_end(tempTerms); it1 += 1) {
+		bool allFollowNullable = true;
+
+		for(Term *it2 = it1 + 1; it2 != cvector_end(tempTerms); it2 += 1) {
+			FirstFollowSet nextFirst = first_follow_set_new();
+
+			analyzer_analyze_firsts_term(a, *it2, &nextFirst);
+			analyzer_analyze_follows_factor(a, it1->factor1, &nextFirst);
+
+			if(!nextFirst.nullable) {
+				allFollowNullable = false;
+				first_follow_set_delete(&nextFirst);
+				break;
+			}
+
+			first_follow_set_delete(&nextFirst);
+		}
+
+		if(allFollowNullable) {
+			analyzer_analyze_follows_factor(a, it1->factor1, ffs);
+		}
+	}
+
+	cvector_free(tempTerms);
+}
+
+static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *ffs) {
+	analyzer_analyze_follows_factor(a, t.factor1, ffs);
+
+	if(optional_is_valid(t.factor2)) {
+		analyzer_analyze_follows_factor(a, *(t.factor2), ffs);
+	}
+}
+
+static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs) {
+	switch(f.tag) {
+	case FactorType_NonTerminal_Identifier: {
+			const FirstFollowSet *ntffs = hashmap_get(a->follows,
+								  &(FirstFollowSet) { .t = f.nonterminal_identifier });
+			if(ntffs != NULL) {
+				set_union(ntffs->tokens, ffs->tokens);
+			} else {
+				FirstFollowSet n = first_follow_set_new();
+
+				n.t = f.nonterminal_identifier;
+				set_union(n.tokens, ffs->tokens);
+				hashmap_set(a->follows, &n);
+			}
+
+		}
+		break;
+	case FactorType_Optional:
+		analyzer_analyze_follows_expression(a, *(f.optional), ffs);
+		break;
+	case FactorType_Repetition: {
+			FirstFollowSet temp = first_follow_set_new();
+			set_union(temp.tokens, ffs->tokens);
+			analyzer_analyze_firsts_expression(a, *(f.repetition), &temp);
+			analyzer_analyze_follows_expression(a, *(f.repetition), &temp);
+			first_follow_set_delete(&temp);
+		}
+		break;
+	case FactorType_Grouping:
+		analyzer_analyze_follows_expression(a, *(f.grouping), ffs);
+		break;
+	case FactorType_Terminal_Identifier:
+		break;
+	case FactorType_Literal:
+		break;
+	default:
+		break;
+	}
+}
 
 static FirstFollowSet first_follow_set_new() {
 	return (FirstFollowSet) {

@@ -31,22 +31,43 @@ int main() {
 		void *item;
 		size_t i = 0;
 
+		printf("FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS\n");
+
 		while(hashmap_iter(a->firsts, &i, &item)) {
 			FirstFollowSet *ffs = item;
 			void *item2;
 			size_t j = 0;
 
-			printf("Key '%s': ", ffs->t.lexeme);
+			printf("Key '%s' (%s): ", ffs->t.lexeme, ffs->nullable ? "NULLABLE" : "NOTNULLABLE");
 
 			while(hashmap_iter(ffs->tokens, &j, &item2)) {
 				Token *t = item2;
-				printf("%s , ", t->lexeme);
+				printf("\"%s\" , ", t->lexeme);
 			}
 
 			printf("\n----------------------------------------\n");
 		}
 	}
-	
+	{
+		printf("FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS\n");
+		void *item;
+		size_t i = 0;
+
+		while(hashmap_iter(a->follows, &i, &item)) {
+			FirstFollowSet *ffs = item;
+			void *item2;
+			size_t j = 0;
+
+			printf("Key '%s' (%s): ", ffs->t.lexeme, ffs->nullable ? "NULLABLE" : "NOTNULLABLE");
+
+			while(hashmap_iter(ffs->tokens, &j, &item2)) {
+				Token *t = item2;
+				printf("\"%s\" , ", t->lexeme);
+			}
+
+			printf("\n----------------------------------------\n");
+		}
+	}
 
 	//ast_print(ast);
 	analyzer_delete(a);
