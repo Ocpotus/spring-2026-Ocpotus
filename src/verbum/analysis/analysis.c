@@ -86,8 +86,19 @@ void analyzer_delete(Analyzer *a) {
 
 		hashmap_free(a->firsts);
 	}
+	{
+		void *item;
+		size_t i = 0;
 
-	hashmap_free(a->follows);
+		while(hashmap_iter(a->follows, &i, &item)) {
+			FirstFollowSet *ffs = item;
+
+			first_follow_set_delete(ffs);
+		}
+
+		hashmap_free(a->follows);
+	}
+
 	memory_delete(a);
 }
 
