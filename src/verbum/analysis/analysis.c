@@ -13,6 +13,8 @@
 #include "analysis.h"
 
 
+/* Analyzer */
+static FirstFollowSet *analyzer_get_first_follow_set(Analyzer *a, Token token);
 /* Token analysis */
 static bool analyzer_analyze_tokens(Analyzer *a);
 static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1);
@@ -45,8 +47,8 @@ static void first_follow_set_delete(FirstFollowSet *ffs);
 /* Hash functions */
 static uint64_t token_hash(const void *item, uint64_t seed0, uint64_t seed1);
 static int token_compare(const void *a, const void *b, void *udata);
-static uint64_t rule_set_hash(const void *item, uint64_t seed0, uint64_t seed1);
-static int rule_set_compare(const void *a, const void *b, void *udata);
+static uint64_t first_follow_set_hash(const void *item, uint64_t seed0, uint64_t seed1);
+static int first_follow_set_compare(const void *a, const void *b, void *udata);
 
 /* Utils */
 static void set_union(struct hashmap *d, struct hashmap *s);
@@ -58,14 +60,10 @@ Analyzer *analyzer_new(AST *ast) {
 			 memory_new, memory_resize, memory_delete,
 			 sizeof(Token), 0, 0, 0,
 			 token_hash, token_compare, NULL, NULL);
-	result->firsts = hashmap_new_with_allocator(
-			 memory_new, memory_resize, memory_delete,
-			 sizeof(FirstFollowSet), 0, 0, 0,
-			 rule_set_hash, rule_set_compare, NULL, NULL);
-	result->follows = hashmap_new_with_allocator(
+	result->sets = hashmap_new_with_allocator(
 			  memory_new, memory_resize, memory_delete,
 			  sizeof(FirstFollowSet), 0, 0, 0,
-			  rule_set_hash, rule_set_compare, NULL, NULL);
+			  first_follow_set_hash, first_follow_set_compare, NULL, NULL);
 	result->ast = ast;
 
 	return result;
@@ -78,25 +76,13 @@ void analyzer_delete(Analyzer *a) {
 		void *item;
 		size_t i = 0;
 
-		while(hashmap_iter(a->firsts, &i, &item)) {
+		while(hashmap_iter(a->sets, &i, &item)) {
 			FirstFollowSet *ffs = item;
 
 			first_follow_set_delete(ffs);
 		}
 
-		hashmap_free(a->firsts);
-	}
-	{
-		void *item;
-		size_t i = 0;
-
-		while(hashmap_iter(a->follows, &i, &item)) {
-			FirstFollowSet *ffs = item;
-
-			first_follow_set_delete(ffs);
-		}
-
-		hashmap_free(a->follows);
+		hashmap_free(a->sets);
 	}
 
 	memory_delete(a);
@@ -112,6 +98,10 @@ static bool analyzer_analyze_tokens(Analyzer *a) {
 	analyzer_analyze_tokens_grammar(a, *(a->ast));
 
 	return true;
+}
+
+static FirstFollowSet *analyzer_get_first_follow_set(Analyzer *a, Token token) {
+	return (FirstFollowSet *)hashmap_get(a->sets, &(FirstFollowSet) { .t = token });
 }
 
 static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1) {
@@ -182,30 +172,32 @@ static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowS
 		changed = false;
 
 		for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
-			const FirstFollowSet *ffsp = hashmap_get(a->firsts, &(FirstFollowSet) { .t = it->token1 });
+			const FirstFollowSet *ffsp = analyzer_get_first_follow_set(a, it->token1);
 			FirstFollowSet ffs;
 			size_t oldcount;
 
 			if(ffsp == NULL) {
 				ffs = first_follow_set_new();
+
 				ffs.t = it->token1;
-				oldcount = hashmap_count(ffs.tokens);
+				oldcount = hashmap_count(ffs.firsts);
 				analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
 
-				if(hashmap_count(ffs.tokens) > oldcount) {
+				if(hashmap_count(ffs.firsts) > oldcount) {
 					changed = true;
-					hashmap_set(a->firsts, &ffs);
+					hashmap_set(a->sets, &ffs);
 				} else {
 					first_follow_set_delete(&ffs);
 				}
+
 			} else {
 				ffs = *ffsp;
-				oldcount = hashmap_count(ffs.tokens);
+				oldcount = hashmap_count(ffs.firsts);
 				analyzer_analyze_firsts_expression(a, *(it->expression1), &ffs);
 
-				if(hashmap_count(ffs.tokens) > oldcount) {
+				if(hashmap_count(ffs.firsts) > oldcount) {
 					changed = true;
-					hashmap_set(a->firsts, &ffs);
+					hashmap_set(a->sets, &ffs);
 				}
 			}
 		}
@@ -225,13 +217,13 @@ static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ff
 
 	analyzer_analyze_firsts_term(a, l.term1, &temp);
 	ffs->nullable = temp.nullable;
-	set_union(ffs->tokens, temp.tokens);
+	set_union(ffs->firsts, temp.firsts);
 	first_follow_set_delete(&temp);
 
 	for(Term *it = cvector_begin(l.term2); ffs->nullable && it != cvector_end(l.term2); it += 1) {
 		temp = first_follow_set_new();
 		analyzer_analyze_firsts_term(a, *it, &temp);
-		set_union(ffs->tokens, temp.tokens);
+		set_union(ffs->firsts, temp.firsts);
 		
 		if(temp.nullable == false) {
 			ffs->nullable = false;
@@ -256,8 +248,8 @@ static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ff
 
 		analyzer_analyze_firsts_factor(a, *t.factor2, &f2);
 
-		while(hashmap_iter(f2.tokens, &i, &item)) {
-			hashmap_delete(f1.tokens, item);
+		while(hashmap_iter(f2.firsts, &i, &item)) {
+			hashmap_delete(f1.firsts, item);
 		}
 
 		if(f2.nullable) {
@@ -267,7 +259,7 @@ static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ff
 		first_follow_set_delete(&f2);
 	}
 
-	set_union(ffs->tokens, f1.tokens);
+	set_union(ffs->firsts, f1.firsts);
 	ffs->nullable = f1.nullable;
 	first_follow_set_delete(&f1);
 }
@@ -275,19 +267,18 @@ static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ff
 static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet *ffs) {
 	switch(f.tag) {
 	case FactorType_Terminal_Identifier:
-		hashmap_set(ffs->tokens, &f.terminal_identifier);
+		hashmap_set(ffs->firsts, &f.terminal_identifier);
 		ffs->nullable = false;
 		break;
 	case FactorType_Literal:
-		hashmap_set(ffs->tokens, &f.literal);
+		hashmap_set(ffs->firsts, &f.literal);
 		ffs->nullable = false;
 		break;
 	case FactorType_NonTerminal_Identifier: {
-			const FirstFollowSet *nonterm_set = hashmap_get(a->firsts,
-									&(FirstFollowSet) { .t = f.nonterminal_identifier });
+			FirstFollowSet *nonterm_set = analyzer_get_first_follow_set(a, f.nonterminal_identifier);
 
 			if(nonterm_set != NULL) {
-				set_union(ffs->tokens, nonterm_set->tokens);
+				set_union(ffs->firsts, nonterm_set->firsts);
 				ffs->nullable = nonterm_set->nullable;
 			}
 		}
@@ -319,30 +310,31 @@ static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollow
 		changed = false;
 
 		for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
-			const FirstFollowSet *ffsp = hashmap_get(a->follows, &(FirstFollowSet) { .t = it->token1 });
+			const FirstFollowSet *ffsp = analyzer_get_first_follow_set(a, it->token1);
 			FirstFollowSet ffs;
 			size_t oldcount;
 
 			if(ffsp == NULL) {
 				ffs = first_follow_set_new();
 				ffs.t = it->token1;
-				oldcount = hashmap_count(ffs.tokens);
+				oldcount = hashmap_count(ffs.follows);
 				analyzer_analyze_follows_expression(a, *(it->expression1), &ffs);
 
-				if(hashmap_count(ffs.tokens) > oldcount) {
+				if(hashmap_count(ffs.follows) > oldcount) {
 					changed = true;
-					hashmap_set(a->follows, &ffs);
+					hashmap_set(a->sets, &ffs);
 				} else {
 					first_follow_set_delete(&ffs);
 				}
 			} else {
 				ffs = *ffsp;
-				oldcount = hashmap_count(ffs.tokens);
+				oldcount = hashmap_count(ffs.follows);
 				analyzer_analyze_follows_expression(a, *(it->expression1), &ffs);
 
-				if(hashmap_count(ffs.tokens) > oldcount) {
+				if(hashmap_count(ffs.follows) > oldcount) {
 					changed = true;
-					hashmap_set(a->follows, &ffs);
+					set_union(ffsp->follows, ffs.firsts);
+					set_union(ffsp->follows, ffs.follows);
 				}
 			}
 		}
@@ -408,18 +400,19 @@ static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *f
 static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs) {
 	switch(f.tag) {
 	case FactorType_NonTerminal_Identifier: {
-			const FirstFollowSet *ntffs = hashmap_get(a->follows,
-								  &(FirstFollowSet) { .t = f.nonterminal_identifier });
+			const FirstFollowSet *ntffs = analyzer_get_first_follow_set(a, f.nonterminal_identifier);
+
 			if(ntffs != NULL) {
-				set_union(ntffs->tokens, ffs->tokens);
+				set_union(ntffs->follows, ffs->firsts);
+				set_union(ntffs->follows, ffs->follows);
 			} else {
 				FirstFollowSet n = first_follow_set_new();
 
 				n.t = f.nonterminal_identifier;
-				set_union(n.tokens, ffs->tokens);
-				hashmap_set(a->follows, &n);
+				set_union(n.follows, ffs->firsts);
+				set_union(n.follows, ffs->follows);
+				hashmap_set(a->sets, &n);
 			}
-
 		}
 		break;
 	case FactorType_Optional:
@@ -427,7 +420,8 @@ static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSe
 		break;
 	case FactorType_Repetition: {
 			FirstFollowSet temp = first_follow_set_new();
-			set_union(temp.tokens, ffs->tokens);
+			set_union(temp.follows, ffs->firsts);
+			set_union(temp.follows, ffs->follows);
 			analyzer_analyze_firsts_expression(a, *(f.repetition), &temp);
 			analyzer_analyze_follows_expression(a, *(f.repetition), &temp);
 			first_follow_set_delete(&temp);
@@ -449,7 +443,11 @@ static FirstFollowSet first_follow_set_new() {
 	return (FirstFollowSet) {
 		.nullable = false,
 		.t = (Token) { 0 },
-		.tokens = hashmap_new_with_allocator(
+		.firsts = hashmap_new_with_allocator(
+			  memory_new, memory_resize, memory_delete,
+			  sizeof(Token), 0, 0, 0,
+			  token_hash, token_compare, NULL, NULL),
+		.follows = hashmap_new_with_allocator(
 			  memory_new, memory_resize, memory_delete,
 			  sizeof(Token), 0, 0, 0,
 			  token_hash, token_compare, NULL, NULL),
@@ -457,11 +455,13 @@ static FirstFollowSet first_follow_set_new() {
 }
 
 static void first_follow_set_delete(FirstFollowSet *ffs) {
-	hashmap_free(ffs->tokens);
+	hashmap_free(ffs->firsts);
+	hashmap_free(ffs->follows);
 	*ffs = (FirstFollowSet) {
 		.nullable = false,
 		.t = (Token) { 0 },
-		.tokens = NULL,
+		.firsts = NULL,
+		.follows = NULL,
 	};
 }
 
@@ -483,13 +483,13 @@ static int token_compare(const void *a, const void *b, void *udata) {
 	return 1;
 }
 
-static uint64_t rule_set_hash(const void *item, uint64_t seed0, uint64_t seed1) {
+static uint64_t first_follow_set_hash(const void *item, uint64_t seed0, uint64_t seed1) {
 	const FirstFollowSet *set = item;
 
 	return hashmap_sip(set->t.lexeme, strlen(set->t.lexeme), seed0, seed1);
 }
 
-static int rule_set_compare(const void *a, const void *b, void *udata) {
+static int first_follow_set_compare(const void *a, const void *b, void *udata) {
 	const FirstFollowSet *ua = a;
 	const FirstFollowSet *ub = b;
 

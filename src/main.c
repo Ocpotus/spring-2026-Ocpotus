@@ -31,36 +31,23 @@ int main() {
 		void *item;
 		size_t i = 0;
 
-		printf("FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS FIRSTS\n");
-
-		while(hashmap_iter(a->firsts, &i, &item)) {
+		while(hashmap_iter(a->sets, &i, &item)) {
 			FirstFollowSet *ffs = item;
 			void *item2;
 			size_t j = 0;
 
-			printf("Key '%s' (%s): ", ffs->t.lexeme, ffs->nullable ? "NULLABLE" : "NOTNULLABLE");
+			printf("Key '%s' (%s)\n", ffs->t.lexeme, ffs->nullable ? "NULLABLE" : "NOTNULLABLE");
+			printf("Firsts: ");
 
-			while(hashmap_iter(ffs->tokens, &j, &item2)) {
+			while(hashmap_iter(ffs->firsts, &j, &item2)) {
 				Token *t = item2;
 				printf("\"%s\" , ", t->lexeme);
 			}
 
-			printf("\n----------------------------------------\n");
-		}
-	}
-	{
-		printf("FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS FOLLOWS\n");
-		void *item;
-		size_t i = 0;
+			j = 0;
+			printf("\nFollows %zu: ", hashmap_count(ffs->follows));
 
-		while(hashmap_iter(a->follows, &i, &item)) {
-			FirstFollowSet *ffs = item;
-			void *item2;
-			size_t j = 0;
-
-			printf("Key '%s' (%s): ", ffs->t.lexeme, ffs->nullable ? "NULLABLE" : "NOTNULLABLE");
-
-			while(hashmap_iter(ffs->tokens, &j, &item2)) {
+			while(hashmap_iter(ffs->follows, &j, &item2)) {
 				Token *t = item2;
 				printf("\"%s\" , ", t->lexeme);
 			}

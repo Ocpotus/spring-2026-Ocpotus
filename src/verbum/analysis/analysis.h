@@ -20,7 +20,8 @@
  */
 typedef struct FirstFollowSet {
 	Token t;
-	struct hashmap *tokens;
+	struct hashmap *firsts;
+	struct hashmap *follows;
 	bool nullable;
 } FirstFollowSet;
 
@@ -28,14 +29,11 @@ typedef struct FirstFollowSet {
  *
  * MEMBERS:
  * 	tokens: hashmap of Token
- * 	firsts: hashmap of FirstFollowSet
- * 	follows: hashmap of FirstFollowSet
- *
+ * 	sets: hashmap of FirstFollowSet
  */
 typedef struct Analyzer {
 	struct hashmap *tokens;
-	struct hashmap *firsts;
-	struct hashmap *follows;
+	struct hashmap *sets;
 	AST *ast;
 } Analyzer;
 
