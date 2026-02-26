@@ -19,9 +19,9 @@
  * 	nullable: can the string derived be null?
  */
 typedef struct FirstFollowSet {
-	Token t;
 	struct hashmap *firsts;
 	struct hashmap *follows;
+	Token t;
 	bool nullable;
 } FirstFollowSet;
 
@@ -30,11 +30,14 @@ typedef struct FirstFollowSet {
  * MEMBERS:
  * 	tokens: hashmap of Token
  * 	sets: hashmap of FirstFollowSet
+ * 	start: the start symbol
+ * 	ast: ast to analyze
  */
 typedef struct Analyzer {
 	struct hashmap *tokens;
 	struct hashmap *sets;
 	AST *ast;
+	Rule start;
 } Analyzer;
 
 Analyzer *analyzer_new(AST *ast);

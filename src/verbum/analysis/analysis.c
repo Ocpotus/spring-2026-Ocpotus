@@ -16,7 +16,7 @@
 /* Analyzer */
 static FirstFollowSet *analyzer_get_first_follow_set(Analyzer *a, Token token);
 /* Token analysis */
-static bool analyzer_analyze_tokens(Analyzer *a);
+static void analyzer_analyze_tokens(Analyzer *a);
 static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1);
 static void analyzer_analyze_tokens_rule(Analyzer *a, Rule r1);
 static void analyzer_analyze_tokens_expression(Analyzer *a, Expression e1);
@@ -24,7 +24,7 @@ static void analyzer_analyze_tokens_list(Analyzer *a, List l1);
 static void analyzer_analyze_tokens_term(Analyzer *a, Term t1);
 static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1);
 /* First analysis */
-static void analyzer_analyze_firsts(Analyzer *a, FirstFollowSet *ffs);
+static void analyzer_analyze_firsts(Analyzer *a);
 static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs);
 static void analyzer_analyze_firsts_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
 static void analyzer_analyze_firsts_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
@@ -32,13 +32,21 @@ static void analyzer_analyze_firsts_list(Analyzer *a, List l, FirstFollowSet *ff
 static void analyzer_analyze_firsts_term(Analyzer *a, Term t, FirstFollowSet *ffs);
 static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
 /* Follow analysis */
-static void analyzer_analyze_follows(Analyzer *a, FirstFollowSet *ffs);
+static void analyzer_analyze_follows(Analyzer *a);
 static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs);
 static void analyzer_analyze_follows_rule(Analyzer *a, Rule r, FirstFollowSet *ffs);
 static void analyzer_analyze_follows_expression(Analyzer *a, Expression e, FirstFollowSet *ffs);
 static void analyzer_analyze_follows_list(Analyzer *a, List l, FirstFollowSet *ffs);
 static void analyzer_analyze_follows_term(Analyzer *a, Term t, FirstFollowSet *ffs);
 static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSet *ffs);
+/* Start symbol analysis */
+static void analyzer_analyze_start_symbol(Analyzer *a);
+static void analyzer_analyze_start_symbol_grammar(Analyzer *a, Grammar g, cvector(Rule) rules);
+static void analyzer_analyze_start_symbol_rule(Analyzer *a, Rule r, cvector(Rule) rules);
+static void analyzer_analyze_start_symbol_expression(Analyzer *a, Expression e, cvector(Rule) rules);
+static void analyzer_analyze_start_symbol_list(Analyzer *a, List l, cvector(Rule) rules);
+static void analyzer_analyze_start_symbol_term(Analyzer *a, Term t, cvector(Rule) rules);
+static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(Rule) rules);
 
 /* FirstFollow set utils */
 static FirstFollowSet first_follow_set_new();
@@ -64,6 +72,7 @@ Analyzer *analyzer_new(AST *ast) {
 			  memory_new, memory_resize, memory_delete,
 			  sizeof(FirstFollowSet), 0, 0, 0,
 			  first_follow_set_hash, first_follow_set_compare, NULL, NULL);
+	result->start = (Rule) { 0 };
 	result->ast = ast;
 
 	return result;
@@ -88,16 +97,24 @@ void analyzer_delete(Analyzer *a) {
 	memory_delete(a);
 }
 
+/* There are multiple pass throughs of analysis.
+ * Essentially each analyze_X takes every possible path
+ * This approach may be computationally redundant (multiple passthroughs)
+ * and can add more time.
+ *
+ * TODO: perhaps there would be a way to translate the grammar into a graph
+ * 	 which may or may not reduce the computational load on each passthrough
+ * 	 or eliminate passthroughs
+ */
 void analyzer_analyze(Analyzer *a) {
 	analyzer_analyze_tokens(a);
-	analyzer_analyze_firsts(a, NULL);
-	analyzer_analyze_follows(a, NULL);
+	analyzer_analyze_firsts(a);
+	analyzer_analyze_follows(a);
+	analyzer_analyze_start_symbol(a);
 }
 
-static bool analyzer_analyze_tokens(Analyzer *a) {
+static void analyzer_analyze_tokens(Analyzer *a) {
 	analyzer_analyze_tokens_grammar(a, *(a->ast));
-
-	return true;
 }
 
 static FirstFollowSet *analyzer_get_first_follow_set(Analyzer *a, Token token) {
@@ -161,7 +178,7 @@ static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1) {
 	}
 }
 
-static void analyzer_analyze_firsts(Analyzer *a, FirstFollowSet *ffs) {
+static void analyzer_analyze_firsts(Analyzer *a) {
 	analyzer_analyze_firsts_grammar(a, *(a->ast), NULL);
 }
 
@@ -299,7 +316,7 @@ static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet
 	}
 }
 
-static void analyzer_analyze_follows(Analyzer *a, FirstFollowSet *ffs) {
+static void analyzer_analyze_follows(Analyzer *a) {
 	analyzer_analyze_follows_grammar(a, *(a->ast), NULL);
 }
 
@@ -333,8 +350,6 @@ static void analyzer_analyze_follows_grammar(Analyzer *a, Grammar g, FirstFollow
 
 				if(hashmap_count(ffs.follows) > oldcount) {
 					changed = true;
-					set_union(ffsp->follows, ffs.firsts);
-					set_union(ffsp->follows, ffs.follows);
 				}
 			}
 		}
@@ -436,6 +451,96 @@ static void analyzer_analyze_follows_factor(Analyzer *a, Factor f, FirstFollowSe
 		break;
 	default:
 		break;
+	}
+}
+
+static void analyzer_analyze_start_symbol(Analyzer *a) {
+	analyzer_analyze_start_symbol_grammar(a, *(a->ast), NULL);
+}
+
+static void analyzer_analyze_start_symbol_grammar(Analyzer *a, Grammar g, cvector(Rule) rules) {
+	cvector(Rule) rs = NULL;
+	cvector_copy(g.rule1, rs);
+
+	for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
+		analyzer_analyze_start_symbol_expression(a, *(it->expression1), rs);
+	}
+
+	if(cvector_size(rs) == 1) {
+		a->start = rs[0];
+	}
+
+	cvector_free(rs);
+}
+
+static void analyzer_analyze_start_symbol_rule(Analyzer *a, Rule r, cvector(Rule) rules);
+
+static void analyzer_analyze_start_symbol_expression(Analyzer *a, Expression e, cvector(Rule) rules) {
+	analyzer_analyze_start_symbol_list(a, e.list1, rules);
+
+	for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
+		analyzer_analyze_start_symbol_list(a, *it, rules);
+	}
+}
+
+static void analyzer_analyze_start_symbol_list(Analyzer *a, List l, cvector(Rule) rules) {
+	analyzer_analyze_start_symbol_term(a, l.term1, rules);
+
+	for(Term *it = cvector_begin(l.term2); it != cvector_end(l.term2); it += 1) {
+		analyzer_analyze_start_symbol_term(a, *it, rules);
+	}
+}
+
+static void analyzer_analyze_start_symbol_term(Analyzer *a, Term t, cvector(Rule) rules) {
+	analyzer_analyze_start_symbol_factor(a, t.factor1, rules);
+
+	if(optional_is_valid(t.factor2)) {
+		analyzer_analyze_start_symbol_factor(a, *(t.factor2), rules);
+	}
+}
+
+static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(Rule) rules) {
+	switch(f.tag) {
+	case FactorType_NonTerminal_Identifier: {
+			size_t i = 0;
+			for(Rule *it = cvector_begin(rules); it != cvector_end(rules); it += 1) {
+				if(strcmp(f.nonterminal_identifier.lexeme, it->token1.lexeme) == 0) {
+					cvector_erase(rules, i);
+
+					break;
+				}
+
+				i += 1;
+			}
+		}
+		break;
+	case FactorType_Optional:
+		analyzer_analyze_start_symbol_expression(a, *(f.optional), rules);
+		break;
+	case FactorType_Repetition:
+		analyzer_analyze_start_symbol_expression(a, *(f.repetition), rules);
+		break;
+	case FactorType_Grouping:
+		analyzer_analyze_start_symbol_expression(a, *(f.grouping), rules);
+		break;
+	case FactorType_Terminal_Identifier: {
+			size_t i = 0;
+			for(Rule *it = cvector_begin(rules); it != cvector_end(rules); it += 1) {
+				if(strcmp(f.terminal_identifier.lexeme, it->token1.lexeme) == 0) {
+					cvector_erase(rules, i);
+
+					break;
+				}
+
+				i += 1;
+			}
+		}
+		break;
+	case FactorType_Literal:
+		break;
+	default:
+		break;
+
 	}
 }
 

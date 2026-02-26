@@ -28,6 +28,7 @@ int main() {
 		}
 	} */
 	{
+		printf("START: %s\n", a->start.token1.lexeme);
 		void *item;
 		size_t i = 0;
 
