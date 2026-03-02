@@ -123,15 +123,14 @@ static FirstFollowSet *analyzer_get_first_follow_set(Analyzer *a, Token token) {
 
 static void analyzer_analyze_tokens_grammar(Analyzer *a, Grammar g1) {
 	for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
-		analyzer_analyze_tokens_rule(a, *it);
+		// Skip terminal declarations, bc they will be handled by lexer.
+		if(it->token1.type != TokenType_Terminal_Identifier) {
+			analyzer_analyze_tokens_rule(a, *it);
+		}
 	}
 }
 
 static void analyzer_analyze_tokens_rule(Analyzer *a, Rule r1) {
-	if(hashmap_get(a->tokens, &r1.token1) == NULL) {
-		hashmap_set(a->tokens, &r1.token1);
-	}
-
 	analyzer_analyze_tokens_expression(a, *(r1.expression1));
 }
 
@@ -163,6 +162,7 @@ static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1) {
 	switch(f1.tag) {
 	case FactorType_NonTerminal_Identifier:
 	case FactorType_Terminal_Identifier:
+		break;
 	case FactorType_Literal:
 		if(hashmap_get(a->tokens, &f1.literal) == NULL) {
 			hashmap_set(a->tokens, &f1.literal);
