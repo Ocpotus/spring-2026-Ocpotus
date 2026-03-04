@@ -47,6 +47,14 @@ static void analyzer_analyze_start_symbol_expression(Analyzer *a, Expression e, 
 static void analyzer_analyze_start_symbol_list(Analyzer *a, List l, cvector(Rule) rules);
 static void analyzer_analyze_start_symbol_term(Analyzer *a, Term t, cvector(Rule) rules);
 static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(Rule) rules);
+/* Cycle analysis */
+static void analyzer_analyze_cycles(Analyzer *a);
+static void analyzer_analyze_cycles_grammar(Analyzer *a, Grammar g, Rule currentRule);
+static bool analyzer_analyze_cycles_rule(Analyzer *a, Rule r, Rule currentRule);
+static bool analyzer_analyze_cycles_expression(Analyzer *a, Expression e, Rule currentRule);
+static bool analyzer_analyze_cycles_list(Analyzer *a, List l, Rule currentRule);
+static bool analyzer_analyze_cycles_term(Analyzer *a, Term t, Rule currentRule);
+static bool analyzer_analyze_cycles_factor(Analyzer *a, Factor f, Rule currentRule);
 
 /* FirstFollow set utils */
 static FirstFollowSet first_follow_set_new();
@@ -69,9 +77,13 @@ Analyzer *analyzer_new(AST *ast) {
 			 sizeof(Token), 0, 0, 0,
 			 token_hash, token_compare, NULL, NULL);
 	result->sets = hashmap_new_with_allocator(
-			  memory_new, memory_resize, memory_delete,
-			  sizeof(FirstFollowSet), 0, 0, 0,
-			  first_follow_set_hash, first_follow_set_compare, NULL, NULL);
+		       memory_new, memory_resize, memory_delete,
+		       sizeof(FirstFollowSet), 0, 0, 0,
+		       first_follow_set_hash, first_follow_set_compare, NULL, NULL);
+	result->cycles = hashmap_new_with_allocator(
+			 memory_new, memory_resize, memory_delete,
+			 sizeof(Token), 0, 0, 0,
+			 token_hash, token_compare, NULL, NULL);
 	result->start = (Rule) { 0 };
 	result->ast = ast;
 
@@ -94,6 +106,7 @@ void analyzer_delete(Analyzer *a) {
 		hashmap_free(a->sets);
 	}
 
+	hashmap_free(a->cycles);
 	memory_delete(a);
 }
 
@@ -111,6 +124,7 @@ void analyzer_analyze(Analyzer *a) {
 	analyzer_analyze_firsts(a);
 	analyzer_analyze_follows(a);
 	analyzer_analyze_start_symbol(a);
+	//analyzer_analyze_cycles(a);
 }
 
 static void analyzer_analyze_tokens(Analyzer *a) {
@@ -542,6 +556,87 @@ static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(
 		break;
 
 	}
+}
+
+static void analyzer_analyze_cycles(Analyzer *a) {
+	analyzer_analyze_cycles_grammar(a, *(a->ast), (Rule) { 0 });
+}
+
+static void analyzer_analyze_cycles_grammar(Analyzer *a, Grammar g, Rule currentRule) {
+	for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
+		analyzer_analyze_cycles_rule(a, *it, *it);
+	}
+}
+
+static bool analyzer_analyze_cycles_rule(Analyzer *a, Rule r, Rule currentRule) {
+	bool result = false;
+
+	if(analyzer_analyze_cycles_expression(a, *(r.expression1), currentRule)) {
+		hashmap_set(a->cycles, &(r.token1));
+		result = true;
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_cycles_expression(Analyzer *a, Expression e, Rule currentRule) {
+	bool result = analyzer_analyze_cycles_list(a, e.list1, currentRule);
+
+	for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2) && result == false; it += 1) {
+		result = analyzer_analyze_cycles_list(a, *it, currentRule);
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_cycles_list(Analyzer *a, List l, Rule currentRule) {
+	bool result = analyzer_analyze_cycles_term(a, l.term1, currentRule);
+
+	for(Term *it = cvector_begin(l.term2); it != cvector_end(l.term2) && result == false; it += 1) {
+		result = analyzer_analyze_cycles_term(a, *it, currentRule);
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_cycles_term(Analyzer *a, Term t, Rule currentRule) {
+	bool result = analyzer_analyze_cycles_factor(a, t.factor1, currentRule);
+
+	if(optional_is_valid(t.factor2) && result == false) {
+		result = analyzer_analyze_cycles_factor(a, *(t.factor2), currentRule);
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_cycles_factor(Analyzer *a, Factor f, Rule currentRule) {
+	bool result = false;
+
+	switch(f.tag) {
+	case FactorType_NonTerminal_Identifier:
+		if(strcmp(currentRule.token1.lexeme, f.nonterminal_identifier.lexeme)) {
+			result = true;
+		}
+		break;
+	case FactorType_Optional:
+		result = analyzer_analyze_cycles_expression(a, *(f.optional), currentRule);
+		break;
+	case FactorType_Repetition:
+		result = analyzer_analyze_cycles_expression(a, *(f.repetition), currentRule);
+		break;
+	case FactorType_Grouping:
+		result = analyzer_analyze_cycles_expression(a, *(f.grouping), currentRule);
+		break;
+	case FactorType_Terminal_Identifier:
+		break;
+	case FactorType_Literal:
+		break;
+	default:
+		break;
+
+	}
+
+	return result;
 }
 
 static FirstFollowSet first_follow_set_new() {

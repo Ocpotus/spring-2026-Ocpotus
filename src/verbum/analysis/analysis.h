@@ -31,11 +31,13 @@ typedef struct FirstFollowSet {
  * 	tokens: hashmap of Token
  * 	sets: hashmap of FirstFollowSet
  * 	start: the start symbol
+ * 	cycles: rules that should be used as a pointer in code generation (hashmap of tokens)
  * 	ast: ast to analyze
  */
 typedef struct Analyzer {
 	struct hashmap *tokens;
 	struct hashmap *sets;
+	struct hashmap *cycles;
 	AST *ast;
 	Rule start;
 } Analyzer;

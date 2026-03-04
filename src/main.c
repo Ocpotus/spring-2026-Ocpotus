@@ -6,6 +6,7 @@
 #include "verbum/token/token.h"
 #include "verbum/analysis/analysis.h"
 #include "verbum/parser/parser.h"
+#include "verbum/code/code.h"
 
 
 int main() {
@@ -27,7 +28,19 @@ int main() {
 			n += 1;
 		}
 	} */
-	{
+	/* {
+		void *item;
+		size_t i = 0;
+		size_t n = 0;
+
+		while(hashmap_iter(a->cycles, &i, &item)) {
+			Token *t = item;
+
+			printf("cycle: %s\n", t->lexeme);
+			n += 1;
+		}
+	} */
+	/* {
 		printf("START: %s\n", a->start.token1.lexeme);
 		void *item;
 		size_t i = 0;
@@ -55,7 +68,11 @@ int main() {
 
 			printf("\n----------------------------------------\n");
 		}
-	}
+	} */
+
+	CodeGenerator cg = code_generator_new(ast, a->start, a->tokens, a->sets);
+
+	code_generator_generate(cg);
 
 	//ast_print(ast);
 	analyzer_delete(a);

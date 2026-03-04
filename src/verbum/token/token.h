@@ -29,6 +29,7 @@ typedef enum TokenType {
         TokenType_EOF = -1, // EOF
 
 	TokenType_Whitespace,
+
         TokenType_NonTerminal_Identifier, // abC_12
         TokenType_Terminal_Identifier, // $aBc32_
 	TokenType_Literal, // "hello", 'hello'
