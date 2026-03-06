@@ -148,6 +148,9 @@ static void ast_delete_term(Term t1) {
 
 static void ast_delete_factor(Factor f1) {
 	switch(f1.tag) {
+	case FactorType_Epsilon:
+		token_delete(f1.nonterminal_identifier);
+		break;
 	case FactorType_NonTerminal_Identifier:
 		token_delete(f1.nonterminal_identifier);
 		break;
@@ -201,8 +204,10 @@ static void ast_print_expression(Expression e1) {
 
 	if(e1.list2 != NULL) {
 		for(List *it = cvector_begin(e1.list2); it != cvector_end(e1.list2); it += 1) {
-			printf("|");
-			ast_print_list(*it);
+			if(it->term1.factor1.tag != FactorType_Epsilon) {
+				printf("|");
+				ast_print_list(*it);
+			}
 		}
 	}
 }

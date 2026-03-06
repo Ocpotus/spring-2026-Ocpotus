@@ -10,7 +10,7 @@
 
 
 int main() {
-	Parser *p = parser_new("ebnf.ebnf");
+	Parser *p = parser_new("c.ebnf");
 	AST *ast = parser_parse(p);
 	Analyzer *a = analyzer_new(ast);
 
@@ -41,6 +41,11 @@ int main() {
 		}
 	} */
 	/* {
+		for(Rule *it = cvector_begin(a->ast->rule1); it != cvector_end(a->ast->rule1); it += 1) {
+			printf("%s\n", it->token1.lexeme);
+		}
+	} */
+	{
 		printf("START: %s\n", a->start.token1.lexeme);
 		void *item;
 		size_t i = 0;
@@ -68,13 +73,13 @@ int main() {
 
 			printf("\n----------------------------------------\n");
 		}
-	} */
+	}
 
 	CodeGenerator cg = code_generator_new(ast, a->start, a->tokens, a->sets);
 
 	code_generator_generate(cg);
 
-	//ast_print(ast);
+	ast_print(ast);
 	analyzer_delete(a);
 	ast_delete(ast);
 	parser_delete(p);

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -6,6 +7,7 @@
 #include "../../lib/c-vector/cvector.h"
 #include "../../lib/hashmap.c/hashmap.h"
 
+#include "../token/token.h"
 #include "../memory/memory.h"
 #include "../ast/ast.h"
 #include "../token/token.h"
@@ -47,14 +49,22 @@ static void analyzer_analyze_start_symbol_expression(Analyzer *a, Expression e, 
 static void analyzer_analyze_start_symbol_list(Analyzer *a, List l, cvector(Rule) rules);
 static void analyzer_analyze_start_symbol_term(Analyzer *a, Term t, cvector(Rule) rules);
 static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(Rule) rules);
-/* Cycle analysis */
-static void analyzer_analyze_cycles(Analyzer *a);
-static void analyzer_analyze_cycles_grammar(Analyzer *a, Grammar g, Rule currentRule);
-static bool analyzer_analyze_cycles_rule(Analyzer *a, Rule r, Rule currentRule);
-static bool analyzer_analyze_cycles_expression(Analyzer *a, Expression e, Rule currentRule);
-static bool analyzer_analyze_cycles_list(Analyzer *a, List l, Rule currentRule);
-static bool analyzer_analyze_cycles_term(Analyzer *a, Term t, Rule currentRule);
-static bool analyzer_analyze_cycles_factor(Analyzer *a, Factor f, Rule currentRule);
+
+typedef struct HoistContext {
+	cvector(Rule) newRules;
+	Token ruleName;
+	int nOptional;
+	int nRepetition;
+	int nGroup;
+} HoistContext;
+/* Scan anonymous expressions */
+static bool analyzer_analyze_anonymous_expression(Analyzer *a, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_grammar(Analyzer *a, Grammar *g, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_rule(Analyzer *a, Rule *r, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_expression(Analyzer *a, Expression *e, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_list(Analyzer *a, List *l, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_term(Analyzer *a, Term *t, HoistContext *hc);
+static bool analyzer_analyze_anonymous_expression_factor(Analyzer *a, Factor *f, HoistContext *hc);
 
 /* FirstFollow set utils */
 static FirstFollowSet first_follow_set_new();
@@ -80,10 +90,6 @@ Analyzer *analyzer_new(AST *ast) {
 		       memory_new, memory_resize, memory_delete,
 		       sizeof(FirstFollowSet), 0, 0, 0,
 		       first_follow_set_hash, first_follow_set_compare, NULL, NULL);
-	result->cycles = hashmap_new_with_allocator(
-			 memory_new, memory_resize, memory_delete,
-			 sizeof(Token), 0, 0, 0,
-			 token_hash, token_compare, NULL, NULL);
 	result->start = (Rule) { 0 };
 	result->ast = ast;
 
@@ -106,7 +112,6 @@ void analyzer_delete(Analyzer *a) {
 		hashmap_free(a->sets);
 	}
 
-	hashmap_free(a->cycles);
 	memory_delete(a);
 }
 
@@ -121,10 +126,10 @@ void analyzer_delete(Analyzer *a) {
  */
 void analyzer_analyze(Analyzer *a) {
 	analyzer_analyze_tokens(a);
+	analyzer_analyze_start_symbol(a);
+	analyzer_analyze_anonymous_expression(a, NULL);
 	analyzer_analyze_firsts(a);
 	analyzer_analyze_follows(a);
-	analyzer_analyze_start_symbol(a);
-	//analyzer_analyze_cycles(a);
 }
 
 static void analyzer_analyze_tokens(Analyzer *a) {
@@ -482,6 +487,8 @@ static void analyzer_analyze_start_symbol_grammar(Analyzer *a, Grammar g, cvecto
 
 	if(cvector_size(rs) == 1) {
 		a->start = rs[0];
+	} else {
+		// Multiple start symbols error
 	}
 
 	cvector_free(rs);
@@ -558,85 +565,128 @@ static void analyzer_analyze_start_symbol_factor(Analyzer *a, Factor f, cvector(
 	}
 }
 
-static void analyzer_analyze_cycles(Analyzer *a) {
-	analyzer_analyze_cycles_grammar(a, *(a->ast), (Rule) { 0 });
+static bool analyzer_analyze_anonymous_expression(Analyzer *a, HoistContext *hc) {
+	analyzer_analyze_anonymous_expression_grammar(a, a->ast, NULL);
+
+	return true;
+
 }
 
-static void analyzer_analyze_cycles_grammar(Analyzer *a, Grammar g, Rule currentRule) {
-	for(Rule *it = cvector_begin(g.rule1); it != cvector_end(g.rule1); it += 1) {
-		analyzer_analyze_cycles_rule(a, *it, *it);
-	}
-}
+static bool analyzer_analyze_anonymous_expression_grammar(Analyzer *a, Grammar *g, HoistContext *hc) {
+	for(size_t it = 0; it < cvector_size(g->rule1); it += 1) {
+		if(g->rule1[it].token1.type == TokenType_NonTerminal_Identifier) {
+			HoistContext hc = {
+				.newRules = NULL,
+				.ruleName = g->rule1[it].token1,
+				.nOptional = 0,
+				.nRepetition = 0,
+				.nGroup = 0,
+			};
 
-static bool analyzer_analyze_cycles_rule(Analyzer *a, Rule r, Rule currentRule) {
-	bool result = false;
+			if(analyzer_analyze_anonymous_expression_expression(a, g->rule1[it].expression1, &hc)) {
+				for(Rule *it2 = cvector_begin(hc.newRules); it2 != cvector_end(hc.newRules); it2 += 1) {
+					cvector_push_back(a->ast->rule1, *it2);
+				}
 
-	if(analyzer_analyze_cycles_expression(a, *(r.expression1), currentRule)) {
-		hashmap_set(a->cycles, &(r.token1));
-		result = true;
-	}
-
-	return result;
-}
-
-static bool analyzer_analyze_cycles_expression(Analyzer *a, Expression e, Rule currentRule) {
-	bool result = analyzer_analyze_cycles_list(a, e.list1, currentRule);
-
-	for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2) && result == false; it += 1) {
-		result = analyzer_analyze_cycles_list(a, *it, currentRule);
-	}
-
-	return result;
-}
-
-static bool analyzer_analyze_cycles_list(Analyzer *a, List l, Rule currentRule) {
-	bool result = analyzer_analyze_cycles_term(a, l.term1, currentRule);
-
-	for(Term *it = cvector_begin(l.term2); it != cvector_end(l.term2) && result == false; it += 1) {
-		result = analyzer_analyze_cycles_term(a, *it, currentRule);
-	}
-
-	return result;
-}
-
-static bool analyzer_analyze_cycles_term(Analyzer *a, Term t, Rule currentRule) {
-	bool result = analyzer_analyze_cycles_factor(a, t.factor1, currentRule);
-
-	if(optional_is_valid(t.factor2) && result == false) {
-		result = analyzer_analyze_cycles_factor(a, *(t.factor2), currentRule);
-	}
-
-	return result;
-}
-
-static bool analyzer_analyze_cycles_factor(Analyzer *a, Factor f, Rule currentRule) {
-	bool result = false;
-
-	switch(f.tag) {
-	case FactorType_NonTerminal_Identifier:
-		if(strcmp(currentRule.token1.lexeme, f.nonterminal_identifier.lexeme)) {
-			result = true;
+				cvector_free(hc.newRules);
+			}
 		}
-		break;
+	}
+
+	return true;
+}
+
+static bool analyzer_analyze_anonymous_expression_rule(Analyzer *a, Rule *r, HoistContext *hc);
+
+static bool analyzer_analyze_anonymous_expression_expression(Analyzer *a, Expression *e, HoistContext *hc) {
+	bool result = analyzer_analyze_anonymous_expression_list(a, &e->list1, hc);
+
+	for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
+		result |= analyzer_analyze_anonymous_expression_list(a, it, hc);
+	}
+
+	return result;
+
+}
+
+static bool analyzer_analyze_anonymous_expression_list(Analyzer *a, List *l, HoistContext *hc) {
+	bool result = analyzer_analyze_anonymous_expression_term(a, &l->term1, hc);
+
+	for(Term *it = cvector_begin(l->term2); it != cvector_end(l->term2); it += 1) {
+		result |= analyzer_analyze_anonymous_expression_term(a, it, hc);
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_anonymous_expression_term(Analyzer *a, Term *t, HoistContext *hc) {
+	bool result = analyzer_analyze_anonymous_expression_factor(a, &t->factor1, hc);
+
+	if(optional_is_valid(t->factor2)) {
+		result |= analyzer_analyze_anonymous_expression_factor(a, t->factor2, hc);
+	}
+
+	return result;
+}
+
+static bool analyzer_analyze_anonymous_expression_factor(Analyzer *a, Factor *f, HoistContext *hc) {
+	char *suffix = NULL;
+	uint8_t count;
+
+	switch(f->tag) {
 	case FactorType_Optional:
-		result = analyzer_analyze_cycles_expression(a, *(f.optional), currentRule);
+		suffix = "Optional";
+		count = hc->nOptional;
+		hc->nOptional += 1;
 		break;
 	case FactorType_Repetition:
-		result = analyzer_analyze_cycles_expression(a, *(f.repetition), currentRule);
+		suffix = "Repetition";
+		count = hc->nRepetition;
+		hc->nRepetition += 1;
 		break;
 	case FactorType_Grouping:
-		result = analyzer_analyze_cycles_expression(a, *(f.grouping), currentRule);
-		break;
-	case FactorType_Terminal_Identifier:
-		break;
-	case FactorType_Literal:
+		suffix = "Group";
+		count = hc->nGroup;
+		hc->nGroup += 1;
 		break;
 	default:
-		break;
-
+		return false;
 	}
 
-	return result;
+	analyzer_analyze_anonymous_expression_expression(a, f->grouping, hc);
+
+	// Create name
+	size_t nl = strlen(hc->ruleName.lexeme);
+	size_t sl = strlen(suffix);
+	char *s = memory_new((nl + sl + 4) * sizeof(*s));
+
+	if(s == NULL) {
+		// Error
+		return false;
+	}
+
+	snprintf(s, nl + sl + 4, "%s%s%d", hc->ruleName.lexeme, suffix, count);
+
+	if(f->tag == FactorType_Optional || f->tag == FactorType_Repetition) {
+		List l = { 0 };
+		l.term1.factor1.tag = FactorType_Epsilon;
+		cvector_push_back(f->grouping->list2, l);
+	}
+
+
+	Rule r = { .expression1 = f->grouping, .token1 = { .lexeme = s, .type = TokenType_NonTerminal_Identifier} };
+	*f = (Factor) {
+		.nonterminal_identifier = (Token) {
+			.lexeme = memory_copy(s, strlen(s) + 1),
+			.pos = r.token1.pos,
+			.type = TokenType_NonTerminal_Identifier,
+		},
+		.tag = FactorType_NonTerminal_Identifier,
+	};
+
+	cvector_push_back(hc->newRules, r);
+
+	return true;
 }
 
 static FirstFollowSet first_follow_set_new() {

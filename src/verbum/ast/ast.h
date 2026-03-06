@@ -22,6 +22,7 @@ typedef enum FactorType {
 	FactorType_Optional,
 	FactorType_Repetition,
 	FactorType_Grouping,
+	FactorType_Epsilon,
 } FactorType;
 
 typedef struct Factor {

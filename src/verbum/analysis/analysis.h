@@ -37,7 +37,6 @@ typedef struct FirstFollowSet {
 typedef struct Analyzer {
 	struct hashmap *tokens;
 	struct hashmap *sets;
-	struct hashmap *cycles;
 	AST *ast;
 	Rule start;
 } Analyzer;
