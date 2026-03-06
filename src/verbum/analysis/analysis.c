@@ -330,6 +330,9 @@ static void analyzer_analyze_firsts_factor(Analyzer *a, Factor f, FirstFollowSet
 	case FactorType_Grouping:
 		analyzer_analyze_firsts_expression(a, *f.grouping, ffs);
 		break;
+	case FactorType_Epsilon:
+		ffs->nullable = true;
+		break;
 	default:
 		break;
 	}
@@ -488,6 +491,7 @@ static void analyzer_analyze_start_symbol_grammar(Analyzer *a, Grammar g, cvecto
 	if(cvector_size(rs) == 1) {
 		a->start = rs[0];
 	} else {
+		fprintf(stderr, "Multiple start symbols detected! Declare only one!\n");
 		// Multiple start symbols error
 	}
 
