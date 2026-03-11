@@ -10,7 +10,7 @@
 
 
 int main() {
-	Parser *p = parser_new("ebnf.ebnf");
+	Parser *p = parser_new("c.ebnf");
 	AST *ast = parser_parse(p);
 	Analyzer *a = analyzer_new(ast);
 

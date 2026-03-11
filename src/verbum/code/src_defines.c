@@ -1,5 +1,25 @@
 #include "src_defines.h"
 
+
+const char *verbum_file_h_contents = "typedef struct VerbumContext {\n"
+"	struct {\n"
+"		void *(*new)(size_t n);\n"
+"		void (*delete)(void *ptr);\n"
+"		void *(*resize)(void *ptr, size_t size);\n"
+"		void *(*copy)(void *data, size_t size);\n"
+"	} memory;\n"
+"	struct {\n"
+"		void *stream;\n"
+"		uint32_t (*get)(void *stream);\n"
+"		uint32_t (*unget)(void *stream);\n"
+"		uint32_t (*tell)(void *stream);\n"
+"		bool (*at_end)(void *stream);\n"
+"		void *(*open)(const char *path);\n"
+"		void (*close)(void *stream);\n"
+"		char *(*copy_from)(void *stream, size_t offset, size_t nbytes);\n"
+"	} io;\n"
+"} VerbumContext;\n";
+
 const char *verbum_parser_file_h_contents =
 "#ifndef VERBUM_PARSER_H\n"
 "#define VERBUM_PARSER_H\n"
