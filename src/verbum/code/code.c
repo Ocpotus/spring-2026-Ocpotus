@@ -27,22 +27,23 @@ static const char *verbum_ast_file_c = "verbum_ast.c";
 static const char *verbum_utf8_h_file = "utf8.h";
 static const char *verbum_utf8file_file_h = "utf8file.h";
 static const char *verbum_utf8file_file_c = "utf8file.c";
-static const char *verbum_gperf_command_sh = "gperf -G -L ANSI-C -H token_hash_keyword -N token_is_keyword verbum_token.gperf > token.c";
+static const char *verbum_gperf_command_sh = "gperf -G -L ANSI-C -H verbum_token_hash -N verbum_token_in_lang verbum_token.gperf > verbum_token.c";
 
 static void cg_generate_verbum(CodeGenerator *cg);
-static void generate_tokens(CodeGenerator *cg);
-static void generate_lexer(CodeGenerator *cg);
-static void generate_ast(CodeGenerator *cg);
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members);
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
+static void cg_generate_tokens(CodeGenerator *cg);
+static void cg_generate_lexer(CodeGenerator *cg);
+static void cg_generate_ast(CodeGenerator *cg);
+static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion);
+static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion);
 static void generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members);
 static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
-static void generate_parser(CodeGenerator *cg);
+static void cg_generate_parser(CodeGenerator *cg);
 static void generate_repetition(CodeGenerator *cg, char c, size_t n);
 static void generate_indent(CodeGenerator *cg);
 
 static void cg_println(CodeGenerator *cg, const char *restrict format, ...);
 static void cg_print(CodeGenerator *cg, const char *restrict format, ...);
+static void cg_put(CodeGenerator *cg, const char c);
 static inline void cg_indent(CodeGenerator *cg);
 static inline void cg_unindent(CodeGenerator *cg);
 static inline void cg_newline(CodeGenerator *cg);
@@ -61,9 +62,9 @@ CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, s
 
 void code_generator_generate(CodeGenerator cg) {
 	cg_generate_verbum(&cg);
-	//generate_tokens(&cg);
-	//generate_lexer(&cg);
-	generate_ast(&cg);
+	cg_generate_tokens(&cg);
+	cg_generate_lexer(&cg);
+	cg_generate_ast(&cg);
 	//generate_parser(&cg);
 }
 
@@ -83,26 +84,30 @@ static void cg_generate_verbum(CodeGenerator *cg) {
 	}
 }
 
-static void generate_tokens(CodeGenerator *cg) {
-	FILE *fp = fopen(verbum_token_file_gperf, "w");
+static void cg_generate_tokens(CodeGenerator *cg) {
+	if(cg_open(cg, verbum_token_file_h)) {
+		cg_println(cg, verbum_token_file_h_contents);
+		cg_close(cg);
+	}
 
-	if(fp != NULL) {
+	if(cg_open(cg, verbum_token_file_gperf)) {
 		void *item;
 		size_t i = 0;
 
-		fprintf(fp, "%%{#include <stdio.h>\n"
+		cg_println(cg, "%%{#include <stdio.h>\n"
 			    "#include <stdlib.h>\n"
 			    "#include <string.h>\n"
 			    "#include <stdbool.h>\n"
-			    "#include \"../memory/memory.h\"\n"
-			    "#include \"token.h\"\n"
+			    "\n"
+			    "#include \"verbum.h\"\n"
+			    "#include \"verbum_token.h\"\n"
 			    "%%}\n");
-		fprintf(fp, "%%%%\n");
+		cg_println(cg, "%%%%\n");
 
 		while(hashmap_iter(cg->tokens, &i, &item)) {
 			Token *token = item;
 
-			fputc('\"', fp);
+			cg_put(cg, '\"');
 
 			/* Step through each character to accomadate for quote or backslash for proper
 			 * c strings, if not a lexeme of " will we result in """, and thus be an unclosed
@@ -111,18 +116,18 @@ static void generate_tokens(CodeGenerator *cg) {
 			while(*(token->lexeme) != '\0') {
 				// Prepend backslash
 				if(*(token->lexeme) == '\\' || *(token->lexeme) == '\"') {
-					fputc('\\', fp);
+					cg_put(cg, '\\');
 				}
 
-				fputc(*(token->lexeme), fp);
+				cg_put(cg, *(token->lexeme));
 				token->lexeme += 1;
 			}
 
-			fprintf(fp, "\"\n");
+			cg_print(cg, "\"\n");
 		}
 
-		fprintf(fp, "%%%%\n");
-		fclose(fp);
+		cg_print(cg, "%%%%\n");
+		cg_close(cg);
 	}
 
 	// For now, portability is not a concern.
@@ -133,16 +138,25 @@ static void generate_tokens(CodeGenerator *cg) {
 	exit(0);
 #endif
 }
-static void generate_lexer(CodeGenerator *cg) {
+static void cg_generate_lexer(CodeGenerator *cg) {
+	if(cg_open(cg, verbum_lexer_file_h)) {
+		cg_println(cg, verbum_lexer_file_h_contents);
+		cg_close(cg);
+	}
+
+	if(cg_open(cg, verbum_lexer_file_c)) {
+		cg_println(cg, verbum_lexer_file_c_contents);
+		// Generate other functions
+		cg_close(cg);
+	}
 }
-
-
 
 typedef enum MemberStat {
 	MemberStat_Pointer = 0x1 << 0,
 	MemberStat_Optional = 0x1 << 1,
 	MemberStat_Repetition = 0x1 << 2,
 	MemberStat_Token,
+	MemberStat_Literal,
 } MemberStat;
 
 typedef struct MemberInfo {
@@ -164,7 +178,7 @@ static void generate_factor(CodeGenerator *cg, Rule r, Factor f, struct hashmap 
 
 // This function is dumb... it opens h file writes and closes then opens c file writes and closes and repeats.
 // but it suffices for now
-static void generate_ast(CodeGenerator *cg) {
+static void cg_generate_ast(CodeGenerator *cg) {
 	cg->fp = fopen(verbum_ast_file_h, "w");
 
 	if(cg->fp == NULL) {
@@ -175,8 +189,8 @@ static void generate_ast(CodeGenerator *cg) {
 	//cg_println(cg, "#include \"%s\"\n", verbum_token_file_h);
 	cg_println(cg, "#ifndef VERBUM_AST_H\n");
 	cg_println(cg, "#define VERBUM_AST_H\n");
-	cg_println(cg, "#include \"%s\"\n", verbum_file_h);
-	cg_println(cg, "typedef struct Token { int i;} Token;\n", verbum_token_file_h);
+	cg_println(cg, "#include \"verbum.h\"\n");
+	cg_println(cg, "#include \"verbum_token.h\"\n");
 
 	for(Rule *it = cvector_begin(cg->ast->rule1); it != cvector_end(cg->ast->rule1); it += 1) {
 		if(it->token1.type != TokenType_Terminal_Identifier) {
@@ -200,34 +214,23 @@ static void generate_ast(CodeGenerator *cg) {
 
 			cg->fp = fopen(verbum_ast_file_h, "a");
 			generate_ast_rule_definition(cg, *it, members);
-			generate_ast_rule_function_new_signature(cg, *it, members);
+			generate_ast_rule_function_new_signature(cg, *it, members, it->expression1->list2 != NULL);
 			generate_ast_rule_function_delete_signature(cg, *it, members);
 			fclose(cg->fp);
 			cg->fp = fopen(verbum_ast_file_c, "a");
-			generate_ast_rule_function_new_definition(cg, *it, members);
+			generate_ast_rule_function_new_definition(cg, *it, members, it->expression1->list2 != NULL);
 			generate_ast_rule_function_delete_definition(cg, *it, members);
 			fclose(cg->fp);
 			hashmap_free(members);
 		}
 	}
 
-	fclose(cg->fp);
 	cg->fp = fopen(verbum_ast_file_h, "a");
 	cg_println(cg, "#endif");
 	fclose(cg->fp);
-
-
-	/* cg->fp = fopen(verbum_ast_file_c, "w+");
-
-	if(cg->fp == NULL) {
-		// Error
-		return;
-	}
-
-	fclose(cg->fp); */
 }
 
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members) {
+static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion) {
 	cvector(MemberInfo) mis = NULL;
 
 	{
@@ -244,10 +247,14 @@ static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, 
 
 	cg_println(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
 
+	if(isUnion) {
+		cg_println(cg, "%sType tag, ", r.token1.lexeme);
+	}
+
 
 	for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
 		for(int i = 0; i < it->numNamed + 1; i += 1) {
-			if(it->stat == MemberStat_Token) {
+			if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
 				cg_println(cg, "Token %s_%d", it->type, i);
 			} else {
 				cg_println(cg, "struct %s *%s_%d", it->type, it->type, i);
@@ -267,7 +274,7 @@ static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, 
 	cg_println(cg, ");\n");
 }
 
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
+static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion) {
 	cvector(MemberInfo) mis = NULL;
 
 	{
@@ -284,10 +291,13 @@ static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r,
 
 	cg_println(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
 
+	if(isUnion) {
+		cg_println(cg, "%sType tag, ", r.token1.lexeme);
+	}
 
 	for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
 		for(int i = 0; i < it->numNamed + 1; i += 1) {
-			if(it->stat == MemberStat_Token) {
+			if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
 				cg_println(cg, "Token %s_%d", it->type, i);
 			} else {
 				cg_println(cg, "struct %s *%s_%d", it->type, it->type, i);
@@ -351,9 +361,7 @@ static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule
 
 		for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
 			for(int i = 0; i < it->numNamed + 1; i += 1) {
-				if(it->stat == MemberStat_Token) {
-					//cg_println(cg, "result->%s_%d = %s_%d;\n", it->type, i, it->type, i);
-				} else {
+				if(it->stat != MemberStat_Token && it->stat != MemberStat_Literal) {
 					cg_println(cg, "ctx->memory.delete(%s->%s_%d);\n", r.token1.lexeme, it->type, i);
 				}
 			}
@@ -368,7 +376,7 @@ static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule
 	cg_println(cg, "}\n");
 }
 
-static void generate_parser(CodeGenerator *cg) {
+static void cg_generate_parser(CodeGenerator *cg) {
 	cg->fp = fopen(verbum_parser_file_h, "w+");
 
 	if(cg->fp == NULL) {
@@ -395,18 +403,11 @@ static void generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashm
 		cg_println(cg, "typedef enum %c%sType {\n", r.token1.lexeme[0], r.token1.lexeme + 1);
 		cg_indent(cg);
 
-		/* if(r.expression1->list1.term1.factor1.tag != FactorType_Literal &&
-		   r.expression1->list1.term1.factor1.tag != FactorType_Epsilon) { */
-			cg_println(cg, "%sType_%zu,\n", r.token1.lexeme, (size_t) 0);
-			offset = 1;
-		//}
+		cg_println(cg, "%sType_%zu,\n", r.token1.lexeme, (size_t) 0);
+		offset = 1;
 
 		for(List *it = cvector_begin(r.expression1->list2); it != cvector_end(r.expression1->list2); it += 1) {
-			//if(it->term1.factor1.tag != FactorType_Literal && it->term1.factor1.tag != FactorType_Epsilon) {
-				cg_println(cg, "%sType_%zu,\n",
-					     r.token1.lexeme,
-					     it - cvector_begin(r.expression1->list2) + offset);
-			//}
+			cg_println(cg, "%sType_%zu,\n", r.token1.lexeme, it - cvector_begin(r.expression1->list2) + offset);
 		}
 
 		cg_unindent(cg);
@@ -438,20 +439,23 @@ static void generate_expression(CodeGenerator *cg, Rule r, Expression e, struct 
 		cg_indent(cg);
 
 		if(e.list1.term2 != NULL) {
-			/* if(e.list1.term2->factor1.tag != FactorType_Literal &&
-			   e.list1.term2->factor1.tag != FactorType_Epsilon) { */
-				generate_list(cg, r, e.list1, members); 
-				offset += 1;
-			//}
+			cg_println(cg, "struct {\n");
+			cg_indent(cg);
+			generate_list(cg, r, e.list1, members); 
+			cg_unindent(cg);
+			cg_println(cg, "};\n");
+			offset += 1;
 		} else {
 			generate_list(cg, r, e.list1, members); 
 		}
 
 		for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
-			if(e.list1.term2 != NULL) {//&&
-			   /* e.list1.term2->factor1.tag != FactorType_Literal &&
-			   e.list1.term2->factor1.tag != FactorType_Epsilon) { */
+			if(it->term2 != NULL && it->term2->factor1.tag != FactorType_Epsilon) {//&&
+				cg_println(cg, "struct {\n");
+				cg_indent(cg);
 				generate_list(cg, r, *it, members); 
+				cg_unindent(cg);
+				cg_println(cg, "};\n");
 			} else {
 				generate_list(cg, r, *it, members); 
 			}
@@ -530,7 +534,28 @@ static void generate_factor(CodeGenerator *cg, Rule r, Factor f, struct hashmap 
 	case FactorType_Grouping:
 		generate_expression(cg, r, *f.grouping, members);
 		break;
-	case FactorType_Literal:
+	case FactorType_Literal: {
+			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
+					.type = "literal",
+					.stat = MemberStat_Literal,
+					});
+
+			if(mi == NULL) {
+				mi = &(MemberInfo) {
+						.numNamed = 0,
+						.stat = MemberStat_Literal,
+						.type = "literal",
+				};
+				hashmap_set(members, mi);
+				cg_println(cg, "Token literal_%d;\n", mi->numNamed);
+			} else {
+				MemberInfo mi2 = *mi;
+
+				mi2.numNamed += 1;
+				hashmap_set(members, &mi2);
+				cg_println(cg, "Token literal_%d;\n", mi2.numNamed);
+			}
+		}
 		break;
 	case FactorType_Repetition:
 		break;
@@ -584,6 +609,10 @@ static void cg_print(CodeGenerator *cg, const char *restrict format, ...) {
 	va_start(args, format);
 	vfprintf(cg->fp, format, args);
 	va_end(args);
+}
+
+static void cg_put(CodeGenerator *cg, const char c) {
+	fputc(c, cg->fp);
 }
 
 static inline void cg_indent(CodeGenerator *cg) {

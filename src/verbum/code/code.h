@@ -5,10 +5,8 @@
 #include <stdlib.h>
 
 #include "../../lib/hashmap.c/hashmap.h"
-#include "../../lib/c-vector/cvector.h"
 
 #include "../ast/ast.h"
-#include "../token/token.h"
 
 
 typedef struct CodeGenerator {
