@@ -115,17 +115,21 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 			}
 		}
 
-		cg_unindent(cg);
 		cg_println(cg, "TokenType_Keyword,");
-		cg_println(cg, "}TokenType;");
+		cg_unindent(cg);
+		cg_println(cg, "} TokenType;");
 		cg_newline(cg);
 		cg_println(cg, "typedef struct Token {");
+		cg_indent(cg);
 		cg_println(cg, "Lexeme lexeme;");
 		cg_println(cg, "TokenType tag;");
 		cg_println(cg, "struct {");
+		cg_indent(cg);
 		cg_println(cg, "uint32_t row;");
 		cg_println(cg, "uint32_t col;");
+		cg_unindent(cg);
 		cg_println(cg, "} pos;");
+		cg_unindent(cg);
 		cg_println(cg, "} Token;");
 		cg_newline(cg);
 		cg_println(cg, "void token_delete(VerbumContext *ctx, Token t);");
@@ -189,7 +193,6 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 		cg_unindent(cg);
 		cg_println(cg, "}");
 		cg_newline(cg);
-
 		cg_println(cg, "TokenType verbum_token_get_lexeme_type(const char *lexeme) {");
 		cg_indent(cg);
 		cg_println(cg, "if(verbum_token_in_language(lexeme, strlen(lexeme)) != NULL) {");
@@ -330,9 +333,10 @@ static void cg_generate_token_function(CodeGenerator *cg, Rule *r) {
 /* Parser generation */
 static void cg_generate_parser_rule(CodeGenerator *cg, Rule *r);
 static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members);
-static void cg_generate_parser_list(CodeGenerator *cg, List *l, size_t choice, bool multipleChoice, struct hashmap *members);
-static void cg_generate_parser_term(CodeGenerator *cg, Term *t, size_t choice, bool multipleChoice, struct hashmap *members);
-static void cg_generate_parser_factor(CodeGenerator *cg, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members);
+static void cg_generate_parser_expression2(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members);
+static void cg_generate_parser_list(CodeGenerator *cg, Rule *r, List *l, size_t choice, bool multipleChoice, struct hashmap *members);
+static void cg_generate_parser_term(CodeGenerator *cg, Rule *r, Term *t, size_t choice, bool multipleChoice, struct hashmap *members);
+static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members);
 
 static void cg_generate_parser_rule(CodeGenerator *cg, Rule *r) {
 	struct hashmap *members = NULL;
@@ -344,7 +348,7 @@ static void cg_generate_parser_rule(CodeGenerator *cg, Rule *r) {
 	members = hashmap_new_with_allocator(memory_new, memory_resize, memory_delete,
 					     sizeof(MemberInfo), 0, 0, 0,
 					     member_info_hash, member_info_compare, NULL, NULL);
-	cg_generate_parser_expression(cg, r, r->expression1, members);
+	cg_generate_parser_expression2(cg, r, r->expression1, members);
 	hashmap_free(members);
 	cg_println(cg, "return result;");
 	cg_unindent(cg);
@@ -455,6 +459,68 @@ EXIT:
 	return result;
 }
 
+static void cg_generate_parser_expression2(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members) {
+	if(!cvector_empty(e->list2)) {
+		size_t count = 0;
+		generate_indent(cg);
+		cg_print(cg, "if(parser_match_any(p, (TokenType []) { ");
+		count = cg_generate_parser_condition(cg, r, &e->list1);
+		cg_print(cg, " }, %zu)) {", count);
+		cg_newline(cg);
+		cg_indent(cg);
+		cg_println(cg, "result = p->ctx->memory.new(1 * sizeof(*result));");
+		cg_newline(cg);
+		cg_println(cg, "if(result != NULL) {");
+		cg_indent(cg);
+		cg_generate_parser_list(cg, r, &e->list1, 0, true, members);
+		cg_println(cg, "result->tag = %sType_0;", r->token1.lexeme);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_unindent(cg);
+		generate_indent(cg);
+		cg_print(cg, "}");
+
+		for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
+			if(it->term1.factor1.tag == FactorType_Epsilon) {
+				cg_print(cg, " else {");
+				cg_newline(cg);
+			} else {
+				cg_print(cg, " else if(parser_match_any(p, (TokenType []) { ");
+				count = cg_generate_parser_condition(cg, r, it);
+				cg_print(cg, " }, %zu)) {", count);
+				cg_newline(cg);
+			}
+
+			cg_indent(cg);
+			cg_println(cg, "result = p->ctx->memory.new(sizeof(*result));");
+			cg_newline(cg);
+			cg_println(cg, "if(result != NULL) {");
+			cg_indent(cg);
+			cg_generate_parser_list(cg, r, it, it - cvector_begin(e->list2) + 1, true, members);
+			cg_println(cg, "result->tag = %sType_%zu;", r->token1.lexeme, it - cvector_begin(e->list2) + 1);
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cg_unindent(cg);
+			generate_indent(cg);
+			cg_print(cg, "}");
+		}
+
+		cg_newline(cg);
+	} else {
+		cg_println(cg, "result = p->ctx->memory.new(1 * sizeof(*result));");
+		cg_newline(cg);
+		cg_println(cg, "if(result != NULL) {");
+		cg_indent(cg);
+		cg_indent(cg);
+		cg_generate_parser_list(cg, r, &e->list1, 0, false, members);
+		cg_unindent(cg);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+	}
+
+	cg_newline(cg);
+}
+
 static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members) {
 	size_t lexeme_count = 0;
 
@@ -467,7 +533,7 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression
 	cg_newline(cg);
 	cg_println(cg, "if(result != NULL) {");
 	cg_indent(cg);
-	cg_generate_parser_list(cg, &e->list1, 0, e->list2 != NULL, members);
+	cg_generate_parser_list(cg, r, &e->list1, 0, e->list2 != NULL, members);
 
 	if(e->list2 != NULL) {
 		cg_println(cg, "result->tag = %sType_0;", r->token1.lexeme);
@@ -489,7 +555,7 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression
 			cg_newline(cg);
 			cg_println(cg, "if(result != NULL) {");
 			cg_indent(cg);
-			cg_generate_parser_list(cg, it, it - cvector_begin(e->list2) + 1, true, members);
+			cg_generate_parser_list(cg, r, it, it - cvector_begin(e->list2) + 1, true, members);
 			cg_println(cg, "result->tag = %sType_%zu;", r->token1.lexeme, it - cvector_begin(e->list2) + 1);
 			cg_unindent(cg);
 			cg_println(cg, "}");
@@ -501,25 +567,28 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression
 	cg_newline(cg);
 }
 
-static void cg_generate_parser_list(CodeGenerator *cg, List *l, size_t choice, bool multipleChoice, struct hashmap *members) {
-	cg_generate_parser_term(cg, &l->term1, choice, multipleChoice, members);
+static void cg_generate_parser_list(CodeGenerator *cg, Rule *r, List *l, size_t choice, bool multipleChoice, struct hashmap *members) {
+	cg_generate_parser_term(cg, r, &l->term1, choice, multipleChoice, members);
 
 	for(Term *it = cvector_begin(l->term2); it != cvector_end(l->term2); it += 1) {
-		cg_generate_parser_term(cg, it, choice, multipleChoice, members);
+		cg_generate_parser_term(cg, r, it, choice, multipleChoice, members);
 	}
 }
 
-static void cg_generate_parser_term(CodeGenerator *cg, Term *t, size_t choice, bool multipleChoice, struct hashmap *members) {
-	cg_generate_parser_factor(cg, &t->factor1, choice, multipleChoice, members);
+static void cg_generate_parser_term(CodeGenerator *cg, Rule *r, Term *t, size_t choice, bool multipleChoice, struct hashmap *members) {
+	cg_generate_parser_factor(cg, r, &t->factor1, choice, multipleChoice, members);
 
 	if(optional_is_valid(t->factor2)) {
-		cg_generate_parser_factor(cg, t->factor2, choice, multipleChoice, members);
+		cg_generate_parser_factor(cg, r, t->factor2, choice, multipleChoice, members);
 	}
 }
 
-static void cg_generate_parser_factor(CodeGenerator *cg, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members) {
+static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members) {
+
+
 	switch(f->tag) {
 	case FactorType_NonTerminal_Identifier: {
+			const FirstFollowSet *ffs = hashmap_get(cg->firstFollowSets, &(FirstFollowSet) { .t = f->nonterminal_identifier });
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = f->nonterminal_identifier.lexeme,
 					.stat = MemberStat_Pointer,
@@ -539,12 +608,40 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Factor *f, size_t choic
 				hashmap_set(members, &mi2);
 			}
 
+			mi = hashmap_get(members, &(MemberInfo) {
+					.type = f->nonterminal_identifier.lexeme,
+					.stat = MemberStat_Pointer,
+					});
+
 			if(multipleChoice) {
 				cg_println(cg, "result->choice%zu.%s_%d = parser_parse_%s(p);", 
 				choice, f->nonterminal_identifier.lexeme, mi->numNamed, f->nonterminal_identifier.lexeme);
+
+				if(!ffs->nullable) {
+					cg_newline(cg);
+					cg_println(cg, "if(result->choice%zu.%s_%d == NULL) {",
+							choice, f->nonterminal_identifier.lexeme, mi->numNamed);
+				}
 			} else {
 				cg_println(cg, "result->%s_%d = parser_parse_%s(p);", 
 				f->nonterminal_identifier.lexeme, mi->numNamed, f->nonterminal_identifier.lexeme);
+
+				if(!ffs->nullable) {
+					cg_newline(cg);
+					cg_println(cg, "if(result->%s_%d == NULL) {",
+							f->nonterminal_identifier.lexeme, mi->numNamed);
+				}
+			}
+
+			if(!ffs->nullable) {
+				cg_indent(cg);
+				cg_println(cg, "verbum_ast_delete_%s(p->ctx, result);", r->token1.lexeme);
+				cg_newline(cg);
+				cg_println(cg, "//Error");
+				cg_println(cg, "return NULL;");
+				cg_unindent(cg);
+				cg_println(cg, "}");
+				cg_newline(cg);
 			}
 		}
 		break;
@@ -568,11 +665,25 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Factor *f, size_t choic
 				hashmap_set(members, &mi2);
 			}
 
+			mi = hashmap_get(members, &(MemberInfo) {
+					.type = f->terminal_identifier.lexeme,
+					.stat = MemberStat_Token,
+					});
+
+			cg_println(cg, "if(!parser_match(p, TokenType_%s)) {", f->literal.lexeme);
+			cg_indent(cg);
+			cg_println(cg, "verbum_ast_delete_%s(p->ctx, result);", r->token1.lexeme);
+			cg_println(cg, "//Error");
+			cg_println(cg, "return NULL;");
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cg_newline(cg);
+
 			if(multipleChoice) {
-				cg_println(cg, "result->choice%zu.%s_%d = parser_advance(p);",
+				cg_println(cg, "result->choice%zu.%s_%d = parser_previous(p);",
 				choice, f->terminal_identifier.lexeme, mi->numNamed);
 			} else {
-				cg_println(cg, "result->%s_%d = parser_advance(p);",
+				cg_println(cg, "result->%s_%d = parser_previous(p);",
 				f->terminal_identifier.lexeme, mi->numNamed);
 			}
 		}
@@ -597,11 +708,25 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Factor *f, size_t choic
 				hashmap_set(members, &mi2);
 			}
 
+			mi = hashmap_get(members, &(MemberInfo) {
+					.type = "literal",
+					.stat = MemberStat_Literal,
+					});
+
+			cg_println(cg, "if(!parser_match(p, verbum_token_get_lexeme_type(\"%s\"))) {", f->literal.lexeme);
+			cg_indent(cg);
+			cg_println(cg, "verbum_ast_delete_%s(p->ctx, result);", r->token1.lexeme);
+			cg_println(cg, "//Error");
+			cg_println(cg, "return NULL;");
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cg_newline(cg);
+
 			if(multipleChoice) {
-				cg_println(cg, "result->choice%zu.literal_%d = parser_advance(p);",
+				cg_println(cg, "result->choice%zu.literal_%d = parser_previous(p);",
 				choice, mi->numNamed);
 			} else {
-				cg_println(cg, "result->literal_%d = parser_advance(p);",
+				cg_println(cg, "result->literal_%d = parser_previous(p);",
 				mi->numNamed);
 			}
 		}
