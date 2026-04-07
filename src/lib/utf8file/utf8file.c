@@ -50,7 +50,7 @@ UTF8File *utf8file_open(const char *path) {
 		char *contents = try(file_extract_contents(path, &size), contents == NULL, { return NULL; });
 
 		result = try(malloc(1 * sizeof(*result)), result == NULL, { return NULL; });
-		result->contents = file_extract_contents(path, &result->size);
+		result->contents = contents;
 		result->size = size;
 		result->offset = 0;
 		result->path = path;

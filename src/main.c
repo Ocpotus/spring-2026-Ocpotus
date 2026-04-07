@@ -129,8 +129,12 @@ void verbum_generate(int argc, char **argv) {
 			printf("\n----------------------------------------\n");
 		}
 	}
-
-	CodeGenerator cg = code_generator_new(ast, a->start, a->tokens, a->sets);
+/*
+	for(TerminalDefinition *it = cvector_begin(a->terminals); it != cvector_end(a->terminals); it += 1) {
+		printf("%s: %s\n", it->rule.token1.lexeme, it->pattern);
+	}
+*/
+	CodeGenerator cg = code_generator_new(ast, a->start, a->tokens, a->sets, a->topterminals);
 
 	code_generator_generate(cg);
 

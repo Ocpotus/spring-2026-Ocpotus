@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
+#include "../../lib/utf8.h/utf8.h"
 #include "../../lib/hashmap.c/hashmap.h"
 #include "../../lib/c-vector/cvector.h"
 
@@ -54,13 +55,15 @@ static void cg_print(CodeGenerator *cg, const char *restrict format, ...);
 static inline void cg_newline(CodeGenerator *cg);
 static inline void cg_indent(CodeGenerator *cg);
 static inline void cg_unindent(CodeGenerator *cg);
+static void cg_print_lexeme(CodeGenerator *cg, Lexeme l);
 
-CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, struct hashmap *firstFollowSets) {
+CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, struct hashmap *firstFollowSets, struct hashmap *topterminals) {
 	return (CodeGenerator) {
 		.ast = ast,
 		.start = start,
 		.tokens = tokens,
 		.firstFollowSets = firstFollowSets,
+		.topterminals = topterminals,
 		.indent = 0,
 	};
 }
@@ -159,23 +162,12 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 		cg_println(cg, "%%%%");
 
 		while(hashmap_iter(cg->tokens, &i, &item)) {
-			Token *token = item;
+			const char *p = ((Token *) item)->lexeme;
 
 			cg_put(cg, '\"');
 
-			/* Step through each character to accomadate for quote or backslash for proper
-			 * c strings, if not a lexeme of " will we result in """, and thus be an unclosed
-			 * c string
-			 */
-			while(*(token->lexeme) != '\0') {
-				// Prepend backslash
-				if(*(token->lexeme) == '\\' || *(token->lexeme) == '\"') {
-					cg_put(cg, '\\');
-				}
+			cg_print_lexeme(cg, ((Token *) item)->lexeme);
 
-				cg_put(cg, *(token->lexeme));
-				token->lexeme += 1;
-			}
 
 			cg_println(cg, "\"");
 		}
@@ -215,6 +207,23 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 	exit(0);
 #endif
 }
+
+
+static char *cg_generate_lexer_condition_rule(CodeGenerator *cg, Rule *r);
+static char *cg_generate_lexer_condition_expression(CodeGenerator *cg, Expression e);
+static char *cg_generate_lexer_condition_list(CodeGenerator *cg, List e);
+static char *cg_generate_lexer_condition_term(CodeGenerator *cg, Term t);
+static char *cg_generate_lexer_condition_factor(CodeGenerator *cg, Factor f);
+static void cg_generate_lexer_language_tokens(CodeGenerator *cg);
+static void cg_generate_lexer_language_token_lexeme(CodeGenerator *cg, const char *const root, const char *l);
+static void cg_generate_lexer_rule(CodeGenerator *cg, Rule *r);
+static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e);
+static void cg_generate_lexer_list(CodeGenerator *cg, List *l);
+static void cg_generate_lexer_term(CodeGenerator *cg, Term *t);
+static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f);
+
+
+
 static void cg_generate_lexer(CodeGenerator *cg) {
 	if(cg_open(cg, verbum_lexer_file_h)) {
 		cg_println(cg, verbum_lexer_file_h_contents);
@@ -226,14 +235,446 @@ static void cg_generate_lexer(CodeGenerator *cg) {
 
 		for(Rule *it = cvector_begin(cg->ast->rule1); it != cvector_end(cg->ast->rule1); it += 1) {
 			if(it->token1.type == TokenType_Terminal_Identifier) {
-				cg_generate_token_function(cg, it);
+				cg_println(cg, "static size_t lexer_lex_%s(Lexer *l);", it->token1.lexeme);
 			}
 		}
 
-		// Generate other functions
+		cg_generate_lexer_language_tokens(cg);
+
+		cg_println(cg, "Token lexer_lex(Lexer *l) {");
+		cg_indent(cg);
+		cg_println(cg, "Token result = {");
+		cg_indent(cg);
+		cg_println(cg, ".lexeme = \"Invalid\",");
+		cg_println(cg, ".tag = TokenType_Invalid,");
+		cg_println(cg, ".pos = {");
+		cg_indent(cg);
+		cg_println(cg, ".row = l->pos.row,");
+		cg_println(cg, ".col = l->pos.col,");
+		cg_unindent(cg);
+		cg_println(cg, "},");
+		cg_unindent(cg);
+		cg_println(cg, "};");
+		cg_println(cg, "uint32_t c = lexer_current_character(l);");
+		cg_println(cg, "size_t length = 0;");
+		cg_newline(cg);
+		cg_println(cg, "while(isascii(c) && isspace(c)) {");
+		cg_indent(cg);
+		cg_println(cg, "c = lexer_advance(l);");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_newline(cg);
+		cg_println(cg, "if(lexer_at_end(l)) {");
+		cg_indent(cg);
+		cg_println(cg, "return (Token) {");
+		cg_indent(cg);
+		cg_println(cg, ".lexeme = \"EOF\",");
+		cg_println(cg, ".tag = TokenType_EOF,");
+		cg_println(cg, ".pos = {");
+		cg_indent(cg);
+		cg_println(cg, ".row = l->pos.row,");
+		cg_println(cg, ".col = l->pos.col,");
+		cg_unindent(cg);
+		cg_println(cg, "},");
+		cg_unindent(cg);
+		cg_println(cg, "};");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_newline(cg);
+		cg_println(cg, "/* Lexer functions */");
+		cg_newline(cg);
+		cg_println(cg, "length = lexer_lex_builtin(l);");
+
+		cg_println(cg, "if(length != 0) {");
+		cg_indent(cg);
+		// Lexeme creation
+		cg_println(cg, "Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);");
+		cg_newline(cg);
+		cg_println(cg, "if(lexeme == NULL) {");
+		cg_indent(cg);
+		cg_println(cg, "// Error");
+		cg_println(cg, "return result;");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_newline(cg);
+		cg_println(cg, "result = (Token) {");
+		cg_indent(cg);
+		cg_println(cg, ".tag = verbum_token_get_lexeme_type(lexeme),");
+		cg_println(cg, ".lexeme = lexeme,");
+		cg_println(cg, ".pos = { 0 },");
+		cg_unindent(cg);
+		cg_println(cg, "};");
+		cg_newline(cg);
+		cg_println(cg, "return result;");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		
+
+		for(Rule *it = cvector_begin(cg->ast->rule1); it != cvector_end(cg->ast->rule1); it += 1) {
+			// Only call lexing functions for terminal types that can be reached from nonterminals
+			if(it->token1.type == TokenType_Terminal_Identifier && hashmap_get(cg->topterminals, &it->token1)) {
+				char *condition = cg_generate_lexer_condition_rule(cg, it);
+
+				if(condition != NULL && *condition != '\0') {
+					generate_indent(cg);
+					cg_print(cg, "if(utf8chr(\"");
+					cg_print(cg, condition);
+					cg_print(cg, "\", c)) {\n");
+					cg_indent(cg);
+					cg_println(cg, "size_t length = lexer_lex_%s(l);", it->token1.lexeme);
+					cg_newline(cg);
+					cg_println(cg, "if(length != 0) {");
+					cg_indent(cg);
+					// Lexeme creation
+					cg_println(cg, "Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);");
+					cg_newline(cg);
+					cg_println(cg, "if(lexeme == NULL) {");
+					cg_indent(cg);
+					cg_println(cg, "// Error");
+					cg_println(cg, "return result;");
+					cg_unindent(cg);
+					cg_println(cg, "}");
+					cg_newline(cg);
+					cg_println(cg, "result = (Token) {");
+					cg_indent(cg);
+					cg_println(cg, ".tag = TokenType_%s,", it->token1.lexeme);
+					cg_println(cg, ".lexeme = lexeme,");
+					cg_println(cg, ".pos = { 0 },");
+					cg_unindent(cg);
+					cg_println(cg, "};");
+					cg_newline(cg);
+					cg_println(cg, "return result;");
+					cg_unindent(cg);
+					cg_println(cg, "}");
+					cg_unindent(cg);
+					cg_println(cg, "}");
+				}
+
+				cvector_free(condition);
+			}
+		}
+
+		cg_newline(cg);
+		cg_println(cg, "lexer_report_error(l, lexer_current_character(l));");
+		cg_println(cg, "lexer_advance(l);");
+		cg_newline(cg);
+		cg_println(cg, "return result;");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+
+		for(Rule *it = cvector_begin(cg->ast->rule1); it != cvector_end(cg->ast->rule1); it += 1) {
+			if(it->token1.type == TokenType_Terminal_Identifier) {
+				cg_generate_lexer_rule(cg, it);
+			}
+		}
+
 		cg_close(cg);
 	}
 }
+
+static void cg_generate_lexer_language_token_lexeme(CodeGenerator *cg, const char *const root, const char *l) {
+	if(*l == '\0') {
+		return;
+	}
+
+	generate_indent(cg);
+	cg_print(cg, "if(lexer_current_character(l) == '");
+
+	if(*(l) == '\\') {
+		cg_print(cg, "\\\\");
+	} else if(*(l) == '\'') {
+		cg_print(cg, "\\'");
+	} else {
+		cg_put(cg, *(l));
+	}
+
+	cg_print(cg, "') {");
+	cg_newline(cg);
+	cg_indent(cg);
+	cg_println(cg, "lexer_advance(l);");
+	cg_println(cg, "result += 1;");
+	cg_generate_lexer_language_token_lexeme(cg, root, l + 1);
+	cg_unindent(cg);
+	cg_println(cg, "} else {");
+	cg_indent(cg);
+
+	for(size_t i = l - root; i != 0; i -= 1) {
+		cg_println(cg, "lexer_undo(l);");
+		cg_println(cg, "result -= 1;");
+	}
+
+	cg_unindent(cg);
+	cg_println(cg, "}");
+}
+
+static void cg_generate_lexer_language_tokens(CodeGenerator *cg) {
+	size_t i = 0;
+	void *item = 0;
+
+	cg_println(cg, "static size_t lexer_lex_builtin(Lexer *l) {");
+	cg_indent(cg);
+	cg_println(cg, "size_t result = 0;");
+
+
+	while(hashmap_iter(cg->tokens, &i, &item)) {
+		Token *token = item;
+
+		cg_generate_lexer_language_token_lexeme(cg, token->lexeme, token->lexeme);
+	}
+
+	cg_unindent(cg);
+	cg_println(cg, "return result;");
+	cg_println(cg, "}");
+}
+
+static void cg_generate_lexer_rule(CodeGenerator *cg, Rule *r) {
+	cg_println(cg, "static size_t lexer_lex_%s(Lexer *l) {", r->token1.lexeme);
+	cg_indent(cg);
+	cg_println(cg, "size_t result = 0;");
+	cg_newline(cg);
+	cg_generate_lexer_expression(cg, r->expression1);
+	cg_newline(cg);
+	cg_println(cg, "return result;");
+	cg_unindent(cg);
+	cg_println(cg, "}");
+	cg_newline(cg);
+}
+
+static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e) {
+	cg_println(cg, "size_t consumed = 0;");
+	cg_generate_lexer_list(cg, &e->list1);
+
+	for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
+		cg_println(cg, "if(result + consumed == result) {");
+		cg_indent(cg);
+		cg_generate_lexer_list(cg, it);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+	}
+
+	cg_println(cg, "result += consumed;");
+}
+
+static void cg_generate_lexer_list(CodeGenerator *cg, List *l) {
+	cg_generate_lexer_term(cg, &l->term1);
+
+	for(Term *it = cvector_begin(l->term2); it != cvector_end(l->term2); it += 1) {
+		cg_generate_lexer_term(cg, it);
+	}
+}
+
+static void cg_generate_lexer_term(CodeGenerator *cg, Term *t) {
+	cg_generate_lexer_factor(cg, &t->factor1);
+}
+
+static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f) {
+	switch(f->tag) {
+	case FactorType_Literal: {
+			cg_generate_lexer_language_token_lexeme(cg, f->literal.lexeme, f->literal.lexeme);
+		}
+		break;
+	case FactorType_Terminal_Identifier:
+		cg_println(cg, "consumed += lexer_lex_%s(l);", f->terminal_identifier.lexeme);
+		break;
+	case FactorType_Optional: {
+			cvector(char) condition = cg_generate_lexer_condition_expression(cg, *f->optional);
+			cg_println(cg, "if(utf8chr(\"%s\", lexer_current_character(l))) {", condition);
+			cg_indent(cg);
+			cg_generate_lexer_expression(cg, f->optional);
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cvector_free(condition);
+		}
+		break;
+	case FactorType_Grouping:
+		cg_println(cg, "{");
+		cg_indent(cg);
+		cg_generate_lexer_expression(cg, f->grouping);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		break;
+	case FactorType_Repetition: {
+			cvector(char) condition = cg_generate_lexer_condition_expression(cg, *f->repetition);
+			cg_println(cg, "while(utf8chr(\"%s\", lexer_current_character(l))) {", condition);
+			cg_indent(cg);
+			cg_generate_lexer_expression(cg, f->repetition);
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cvector_free(condition);
+		}
+
+		break;
+	default:
+		break;
+	}
+}
+
+static char *cg_generate_lexer_condition_rule(CodeGenerator *cg, Rule *r) {
+	const FirstFollowSet *ffs = hashmap_get(cg->firstFollowSets, &(FirstFollowSet){ .t = r->token1 });
+	cvector(char) result = NULL;
+
+	if(ffs != NULL) {
+		size_t i = 0;
+		void *item;
+
+		while(hashmap_iter(ffs->firsts, &i, &item)) {
+			Token *token = item;
+
+			if(token->type == TokenType_Literal) {
+				const char *p = token->lexeme;
+
+				while(*p != '\0') {
+					if(*p == '\\' || *p == '\"') {
+						cvector_push_back(result, '\\');
+					}
+
+					cvector_push_back(result, *p);
+					p += 1;
+				}
+			} else if(token->type == TokenType_Terminal_Identifier) {
+				char *temp = cg_generate_lexer_condition_rule(cg, &(Rule) { .token1 = *token });
+
+				if(temp) {
+					for (char *it = temp; *it != '\0'; it += 1) {
+						cvector_push_back(result, *it);
+					}
+
+					cvector_free(temp);
+				}
+			}
+		}
+	}
+
+	cvector_push_back(result, '\0');
+
+	return result;
+}
+
+static char *cg_generate_lexer_condition_expression(CodeGenerator *cg, Expression e) {
+	cvector(char) result = NULL;
+	cvector(char) l1 = cg_generate_lexer_condition_list(cg, e.list1);
+
+	if(!cvector_empty(e.list2)) {
+		if(!cvector_empty(l1)) {
+			char *curr = l1;
+
+			while(*curr != '\0') {
+				cvector_push_back(result, *curr);
+				curr += 1;
+			}
+
+			cvector_free(l1);
+		}
+
+		for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
+			cvector(char) l2 = cg_generate_lexer_condition_list(cg, *it);
+
+			if(!cvector_empty(l2)) {
+				char *curr = l2;
+
+				while(*curr != '\0') {
+					cvector_push_back(result, *curr);
+					curr += 1;
+				}
+
+				cvector_free(l2);
+			}
+		}
+	} else {
+		result = l1;
+	}
+
+	cvector_push_back(result, '\0');
+
+	return result;
+}
+
+static char *cg_generate_lexer_condition_list(CodeGenerator *cg, List l) {
+	cvector(char) result = NULL;
+	cvector(char) t1 = cg_generate_lexer_condition_term(cg, l.term1);
+
+	if(l.term1.factor1.tag == FactorType_Optional || l.term1.factor1.tag == FactorType_Repetition) {
+		for(char *it = cvector_begin(t1); it != cvector_end(t1); it += 1) {
+			cvector_push_back(result, *it);
+		}
+
+		cvector_free(t1);
+
+		for(Term *it = cvector_begin(l.term2); it != cvector_end(l.term2); it += 1) {
+			cvector(char) t2 = cg_generate_lexer_condition_term(cg, *it);
+
+			for(char *it = cvector_begin(t2); it != cvector_end(t2); it += 1) {
+				cvector_push_back(result, *it);
+			}
+
+			cvector_free(t2);
+
+			if(it->factor1.tag != FactorType_Optional && it->factor1.tag != FactorType_Repetition) {
+				break;
+			}
+		}
+	} else {
+		result = t1;
+	}
+
+	cvector_push_back(result, '\0');
+
+	return result;
+}
+
+static char *cg_generate_lexer_condition_term(CodeGenerator *cg, Term t) {
+	cvector(char) result = NULL;
+	cvector(char) f1 = cg_generate_lexer_condition_factor(cg, t.factor1);
+	
+	if(t.factor2 != NULL) {
+		cvector(char) f2 = cg_generate_lexer_condition_factor(cg, *t.factor2);
+
+		for(char *it = cvector_begin(f1); it != cvector_end(f1); it += 1) {
+			if(!utf8chr(f2, *it)) {
+				cvector_push_back(result, *it);
+			}
+		}
+
+		cvector_free(f1);
+		cvector_free(f2);
+	} else {
+		result = f1;
+	}
+
+	cvector_push_back(result, '\0');
+
+	return result; 
+}
+
+static char *cg_generate_lexer_condition_factor(CodeGenerator *cg, Factor f) {
+	cvector(char) result = NULL;
+
+	switch(f.tag) {
+	case FactorType_NonTerminal_Identifier:
+		break;
+	case FactorType_Terminal_Identifier:
+		result = cg_generate_lexer_condition_rule(cg, &(Rule) { .token1 = f.terminal_identifier});
+		break;
+	case FactorType_Repetition:
+		result = cg_generate_lexer_condition_expression(cg, *f.repetition);
+		break;
+	case FactorType_Optional:
+		result = cg_generate_lexer_condition_expression(cg, *f.optional);
+		break;
+	case FactorType_Grouping:
+		result = cg_generate_lexer_condition_expression(cg, *f.grouping);
+		break;
+	case FactorType_Literal:
+		cvector_push_back(result, f.literal.lexeme[0]);
+		cvector_push_back(result, '\0');
+		break;
+	default:
+		break;
+	}
+
+	return result;
+}
+
 
 typedef enum MemberStat {
 	MemberStat_Pointer = 0x1 << 0,
@@ -320,14 +761,7 @@ static void cg_generate_ast(CodeGenerator *cg) {
 }
 
 static void cg_generate_token_function(CodeGenerator *cg, Rule *r) {
-	cg_println(cg, "static Token verbum_lexer_lex_%s(Lexer *l) {", r->token1.lexeme);
-	cg_indent(cg);
-	cg_println(cg, "Token result = { 0 };");
-	cg_newline(cg);
-	cg_println(cg, "return result;");
-	cg_unindent(cg);
-	cg_println(cg, "}");
-	cg_newline(cg);
+
 }
 
 /* Parser generation */
@@ -1156,4 +1590,20 @@ static bool cg_close(CodeGenerator *cg) {
 	}
 
 	return fclose(cg->fp) == 0;
+}
+
+static void cg_print_lexeme(CodeGenerator *cg, Lexeme l) {
+	/* Step through each character to accomadate for quote or backslash for proper
+	 * c strings, if not a lexeme of " will we result in """, and thus be an unclosed
+	 * c string
+	 */
+	while(*(l) != '\0') {
+		// Prepend backslash
+		if(*(l) == '\\' || *(l) == '\"') {
+			cg_put(cg, '\\');
+		}
+
+		cg_put(cg, *(l));
+		l += 1;
+	}
 }

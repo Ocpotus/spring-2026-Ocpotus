@@ -25,6 +25,14 @@ static void analyzer_analyze_tokens_expression(Analyzer *a, Expression e1);
 static void analyzer_analyze_tokens_list(Analyzer *a, List l1);
 static void analyzer_analyze_tokens_term(Analyzer *a, Term t1);
 static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1);
+/* Top terminal analysis */
+static void analyzer_analyze_top_terminals(Analyzer *a);
+static void analyzer_analyze_top_terminals_grammar(Analyzer *a, Grammar g1);
+static void analyzer_analyze_top_terminals_rule(Analyzer *a, Rule r1);
+static void analyzer_analyze_top_terminals_expression(Analyzer *a, Expression e1);
+static void analyzer_analyze_top_terminals_list(Analyzer *a, List l1);
+static void analyzer_analyze_top_terminals_term(Analyzer *a, Term t1);
+static void analyzer_analyze_top_terminals_factor(Analyzer *a, Factor f1);
 /* First analysis */
 static void analyzer_analyze_firsts(Analyzer *a);
 static void analyzer_analyze_firsts_grammar(Analyzer *a, Grammar g, FirstFollowSet *ffs);
@@ -86,6 +94,10 @@ Analyzer *analyzer_new(AST *ast) {
 			 memory_new, memory_resize, memory_delete,
 			 sizeof(Token), 0, 0, 0,
 			 token_hash, token_compare, NULL, NULL);
+	result->topterminals = hashmap_new_with_allocator(
+			       memory_new, memory_resize, memory_delete,
+			       sizeof(Token), 0, 0, 0,
+			       token_hash, token_compare, NULL, NULL);
 	result->sets = hashmap_new_with_allocator(
 		       memory_new, memory_resize, memory_delete,
 		       sizeof(FirstFollowSet), 0, 0, 0,
@@ -98,6 +110,7 @@ Analyzer *analyzer_new(AST *ast) {
 
 void analyzer_delete(Analyzer *a) {
 	hashmap_free(a->tokens);
+	hashmap_free(a->topterminals);
 
 	{
 		void *item;
@@ -126,6 +139,7 @@ void analyzer_delete(Analyzer *a) {
  */
 void analyzer_analyze(Analyzer *a) {
 	analyzer_analyze_tokens(a);
+	analyzer_analyze_top_terminals(a);
 	analyzer_analyze_start_symbol(a);
 	analyzer_analyze_anonymous_expression(a, NULL);
 	analyzer_analyze_firsts(a);
@@ -191,6 +205,67 @@ static void analyzer_analyze_tokens_factor(Analyzer *a, Factor f1) {
 	case FactorType_Repetition:
 	case FactorType_Grouping:
 		analyzer_analyze_tokens_expression(a, *(f1.repetition));
+		break;
+	default:
+		break;
+	}
+}
+
+static void analyzer_analyze_top_terminals(Analyzer *a) {
+	analyzer_analyze_top_terminals_grammar(a, *(a->ast));
+}
+
+static void analyzer_analyze_top_terminals_grammar(Analyzer *a, Grammar g1) {
+	for(Rule *it = cvector_begin(g1.rule1); it != cvector_end(g1.rule1); it += 1) {
+		if(it->token1.type != TokenType_Terminal_Identifier) {
+			analyzer_analyze_top_terminals_rule(a, *it);
+		}
+	}
+}
+
+static void analyzer_analyze_top_terminals_rule(Analyzer *a, Rule r1) {
+	analyzer_analyze_top_terminals_expression(a, *(r1.expression1));
+}
+
+static void analyzer_analyze_top_terminals_expression(Analyzer *a, Expression e1) {
+	analyzer_analyze_top_terminals_list(a, e1.list1);
+
+	for(List *it = cvector_begin(e1.list2); it != cvector_end(e1.list2); it += 1) {
+		analyzer_analyze_top_terminals_list(a, *it);
+	}
+}
+
+static void analyzer_analyze_top_terminals_list(Analyzer *a, List l1) {
+	analyzer_analyze_top_terminals_term(a, l1.term1);
+
+	for(Term *it = cvector_begin(l1.term2); it != cvector_end(l1.term2); it += 1) {
+		analyzer_analyze_top_terminals_term(a, *it);
+	}
+}
+
+static void analyzer_analyze_top_terminals_term(Analyzer *a, Term t1) {
+	analyzer_analyze_top_terminals_factor(a, t1.factor1);
+
+	if(optional_is_valid(t1.factor2)) {
+		analyzer_analyze_top_terminals_factor(a, *(t1.factor2));
+	}
+}
+
+static void analyzer_analyze_top_terminals_factor(Analyzer *a, Factor f1) {
+	switch(f1.tag) {
+	case FactorType_NonTerminal_Identifier:
+		break;
+	case FactorType_Terminal_Identifier:
+		if(hashmap_get(a->topterminals, &f1.terminal_identifier) == NULL) {
+			hashmap_set(a->topterminals, &f1.terminal_identifier);
+		}
+		break;
+	case FactorType_Literal:
+		break;
+	case FactorType_Optional:
+	case FactorType_Repetition:
+	case FactorType_Grouping:
+		analyzer_analyze_top_terminals_expression(a, *(f1.repetition));
 		break;
 	default:
 		break;

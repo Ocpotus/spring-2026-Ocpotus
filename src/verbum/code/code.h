@@ -14,11 +14,12 @@ typedef struct CodeGenerator {
 	Rule start;
 	struct hashmap *tokens;
 	struct hashmap *firstFollowSets;
+	struct hashmap *topterminals; // Terminals used within non-terminals
 	size_t indent;
 	FILE *fp;
 } CodeGenerator;
 
-CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, struct hashmap *firstFollowSets);
+CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, struct hashmap *firstFollowSets, struct hashmap *topterminals);
 void code_generator_generate(CodeGenerator cg);
 
 
