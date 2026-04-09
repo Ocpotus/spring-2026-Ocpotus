@@ -34,14 +34,14 @@ static const char *verbum_gperf_command_sh = "gperf -G -L ANSI-C -H verbum_token
 /* Generation functions */
 static void cg_generate_verbum(CodeGenerator *cg);
 static void cg_generate_tokens(CodeGenerator *cg);
-static void cg_generate_lexer(CodeGenerator *cg);
 static void cg_generate_ast(CodeGenerator *cg);
 static void cg_generate_token_function(CodeGenerator *cg, Rule *r);
+static void cg_generate_lexer(CodeGenerator *cg);
 
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion);
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion);
+static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
+static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
 static void generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members);
-static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
+static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
 static void cg_generate_parser(CodeGenerator *cg);
 static void generate_repetition(CodeGenerator *cg, char c, size_t n);
 static void generate_indent(CodeGenerator *cg);
@@ -71,8 +71,8 @@ CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, s
 void code_generator_generate(CodeGenerator cg) {
 	cg_generate_verbum(&cg);
 	cg_generate_tokens(&cg);
-	cg_generate_lexer(&cg);
 	cg_generate_ast(&cg);
+	cg_generate_lexer(&cg);
 	cg_generate_parser(&cg);
 }
 
@@ -675,7 +675,6 @@ static char *cg_generate_lexer_condition_factor(CodeGenerator *cg, Factor f) {
 	return result;
 }
 
-
 typedef enum MemberStat {
 	MemberStat_Pointer = 0x1 << 0,
 	MemberStat_Optional = 0x1 << 1,
@@ -688,18 +687,21 @@ typedef struct MemberInfo {
 	// Keys
 	const char *type;
 	MemberStat stat;
+	size_t choice;
+	bool isMultipleChoice;
 	// Values
 	int numNamed;
 } MemberInfo;
 
+
 static uint64_t member_info_hash(const void *item, uint64_t seed0, uint64_t seed1);
 static int member_info_compare(const void *a, const void *b, void *udata);
 
-static void generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
+static size_t generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
 static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, struct hashmap *members);
-static void cg_generate_ast_list(CodeGenerator *cg, Rule r, List l, struct hashmap *members);
-static void cg_generate_ast_term(CodeGenerator *cg, Rule r, Term t, struct hashmap *members);
-static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct hashmap *members);
+static void cg_generate_ast_list(CodeGenerator *cg, Rule r, List l, size_t choice, bool isMultipleChoice, struct hashmap *members);
+static void cg_generate_ast_term(CodeGenerator *cg, Rule r, Term t, size_t choice, bool isMultipleChoice, struct hashmap *members);
+static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, size_t choice, bool isMultipleChoice, struct hashmap *members);
 
 // This function is dumb... it opens h file writes and closes then opens c file writes and closes and repeats.
 // but it suffices for now
@@ -741,13 +743,13 @@ static void cg_generate_ast(CodeGenerator *cg) {
 						  member_info_hash, member_info_compare, NULL, NULL);
 
 			cg->fp = fopen(verbum_ast_file_h, "a");
-			generate_ast_rule_definition(cg, *it, members);
-			generate_ast_rule_function_new_signature(cg, *it, members, it->expression1->list2 != NULL);
+			size_t count = generate_ast_rule_definition(cg, *it, members);
+			generate_ast_rule_function_new_signature(cg, *it, members, count);
 			generate_ast_rule_function_delete_signature(cg, *it, members);
 			fclose(cg->fp);
 			cg->fp = fopen(verbum_ast_file_c, "a");
-			generate_ast_rule_function_new_definition(cg, *it, members, it->expression1->list2 != NULL);
-			generate_ast_rule_function_delete_definition(cg, *it, members);
+			generate_ast_rule_function_new_definition(cg, *it, members, count);
+			generate_ast_rule_function_delete_definition(cg, *it, members, count);
 			fclose(cg->fp);
 			hashmap_free(members);
 		}
@@ -767,7 +769,6 @@ static void cg_generate_token_function(CodeGenerator *cg, Rule *r) {
 /* Parser generation */
 static void cg_generate_parser_rule(CodeGenerator *cg, Rule *r);
 static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members);
-static void cg_generate_parser_expression2(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members);
 static void cg_generate_parser_list(CodeGenerator *cg, Rule *r, List *l, size_t choice, bool multipleChoice, struct hashmap *members);
 static void cg_generate_parser_term(CodeGenerator *cg, Rule *r, Term *t, size_t choice, bool multipleChoice, struct hashmap *members);
 static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members);
@@ -782,7 +783,7 @@ static void cg_generate_parser_rule(CodeGenerator *cg, Rule *r) {
 	members = hashmap_new_with_allocator(memory_new, memory_resize, memory_delete,
 					     sizeof(MemberInfo), 0, 0, 0,
 					     member_info_hash, member_info_compare, NULL, NULL);
-	cg_generate_parser_expression2(cg, r, r->expression1, members);
+	cg_generate_parser_expression(cg, r, r->expression1, members);
 	hashmap_free(members);
 	cg_println(cg, "return result;");
 	cg_unindent(cg);
@@ -893,7 +894,7 @@ EXIT:
 	return result;
 }
 
-static void cg_generate_parser_expression2(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members) {
+static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members) {
 	if(!cvector_empty(e->list2)) {
 		size_t count = 0;
 		generate_indent(cg);
@@ -955,52 +956,6 @@ static void cg_generate_parser_expression2(CodeGenerator *cg, Rule *r, Expressio
 	cg_newline(cg);
 }
 
-static void cg_generate_parser_expression(CodeGenerator *cg, Rule *r, Expression *e, struct hashmap *members) {
-	size_t lexeme_count = 0;
-
-	generate_indent(cg);
-	cg_print(cg, "if(parser_match_any(p, (TokenType[]) { ");
-	lexeme_count = cg_generate_parser_condition(cg, r, &e->list1);
-	cg_print(cg, " }, %zu)) {\n", lexeme_count);
-	cg_indent(cg);
-	cg_println(cg, "result = p->ctx->memory.new(1 * sizeof(*result));");
-	cg_newline(cg);
-	cg_println(cg, "if(result != NULL) {");
-	cg_indent(cg);
-	cg_generate_parser_list(cg, r, &e->list1, 0, e->list2 != NULL, members);
-
-	if(e->list2 != NULL) {
-		cg_println(cg, "result->tag = %sType_0;", r->token1.lexeme);
-	}
-
-	cg_unindent(cg);
-	cg_println(cg, "}");
-	cg_unindent(cg);
-
-	for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
-		if(it->term1.factor1.tag != FactorType_Epsilon) {
-			generate_indent(cg);
-			cg_print(cg, "} else if(parser_match_any(p, (TokenType[]) { ");
-			lexeme_count = cg_generate_parser_condition(cg, r, it);
-			cg_print(cg, " }, %zu)) {", lexeme_count);
-			cg_newline(cg);
-			cg_indent(cg);
-			cg_println(cg, "result = p->ctx->memory.new(1 * sizeof(*result));");
-			cg_newline(cg);
-			cg_println(cg, "if(result != NULL) {");
-			cg_indent(cg);
-			cg_generate_parser_list(cg, r, it, it - cvector_begin(e->list2) + 1, true, members);
-			cg_println(cg, "result->tag = %sType_%zu;", r->token1.lexeme, it - cvector_begin(e->list2) + 1);
-			cg_unindent(cg);
-			cg_println(cg, "}");
-			cg_unindent(cg);
-		}
-	}
-
-	cg_println(cg, "}");
-	cg_newline(cg);
-}
-
 static void cg_generate_parser_list(CodeGenerator *cg, Rule *r, List *l, size_t choice, bool multipleChoice, struct hashmap *members) {
 	cg_generate_parser_term(cg, r, &l->term1, choice, multipleChoice, members);
 
@@ -1018,14 +973,14 @@ static void cg_generate_parser_term(CodeGenerator *cg, Rule *r, Term *t, size_t 
 }
 
 static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, size_t choice, bool multipleChoice, struct hashmap *members) {
-
-
 	switch(f->tag) {
 	case FactorType_NonTerminal_Identifier: {
 			const FirstFollowSet *ffs = hashmap_get(cg->firstFollowSets, &(FirstFollowSet) { .t = f->nonterminal_identifier });
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = f->nonterminal_identifier.lexeme,
 					.stat = MemberStat_Pointer,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1033,6 +988,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 						.numNamed = 0,
 						.stat = MemberStat_Pointer,
 						.type = f->nonterminal_identifier.lexeme,
+						.choice = choice,
+						.isMultipleChoice = multipleChoice,
 				};
 				hashmap_set(members, mi);
 			} else {
@@ -1045,6 +1002,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 			mi = hashmap_get(members, &(MemberInfo) {
 					.type = f->nonterminal_identifier.lexeme,
 					.stat = MemberStat_Pointer,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			if(multipleChoice) {
@@ -1083,6 +1042,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = f->terminal_identifier.lexeme,
 					.stat = MemberStat_Token,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1090,6 +1051,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 						.numNamed = 0,
 						.stat = MemberStat_Token,
 						.type = f->terminal_identifier.lexeme,
+						.choice = choice,
+						.isMultipleChoice = multipleChoice,
 				};
 				hashmap_set(members, mi);
 			} else {
@@ -1102,6 +1065,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 			mi = hashmap_get(members, &(MemberInfo) {
 					.type = f->terminal_identifier.lexeme,
 					.stat = MemberStat_Token,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			cg_println(cg, "if(!parser_match(p, TokenType_%s)) {", f->literal.lexeme);
@@ -1126,6 +1091,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = "literal",
 					.stat = MemberStat_Literal,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1133,6 +1100,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 						.numNamed = 0,
 						.stat = MemberStat_Literal,
 						.type = "literal",
+						.choice = choice,
+						.isMultipleChoice = multipleChoice,
 				};
 				hashmap_set(members, mi);
 			} else {
@@ -1145,6 +1114,8 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 			mi = hashmap_get(members, &(MemberInfo) {
 					.type = "literal",
 					.stat = MemberStat_Literal,
+					.choice = choice,
+					.isMultipleChoice = multipleChoice,
 					});
 
 			cg_println(cg, "if(!parser_match(p, verbum_token_get_lexeme_type(\"%s\"))) {", f->literal.lexeme);
@@ -1170,149 +1141,303 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule *r, Factor *f, siz
 	}
 }
 
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion) {
-	cvector(MemberInfo) mis = NULL;
+static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+	if(choices > 1) {
+		for(size_t choice = 0; choice < choices; choice += 1) {
+			cvector(MemberInfo) mis = NULL;
 
-	{
-		size_t i = 0;
-		void *item;
+			{
+				size_t j = 0;
+				void *item;
 
-		while(hashmap_iter(members, &i, &item)) {
-			const MemberInfo *mi = item;
+				while(hashmap_iter(members, &j, &item)) {
+					const MemberInfo *mi = item;
 
-			cvector_push_back(mis, *mi);
-		}
-
-	}
-
-	cg_print(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
-
-	if(isUnion) {
-		cg_print(cg, "%sType tag, ", r.token1.lexeme);
-	}
-
-
-	for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
-		for(int i = 0; i < it->numNamed + 1; i += 1) {
-			if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
-				cg_print(cg, "Token %s_%d", it->type, i);
-			} else {
-				cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+					if(mi->choice == choice) {
+						cvector_push_back(mis, *mi);
+					}
+				}
 			}
 
-			if(i != it->numNamed) {
+			cg_print(cg, "struct %s *verbum_ast_new_%s_choice%zu(struct VerbumContext *ctx", r.token1.lexeme, r.token1.lexeme, choice);
+
+			for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+				cg_print(cg, ", ");
+
+				for(int i = 0; i < it->numNamed + 1; i += 1) {
+					if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
+						cg_print(cg, "Token %s_%d", it->type, i);
+					} else {
+						cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+					}
+
+					if(i < it->numNamed && it + 1 != cvector_end(mis)) {
+						cg_print(cg, ", ");
+
+					}
+				}
+			}
+
+			cvector_free(mis);
+			cg_println(cg, ");");
+		}
+	} else {
+		cvector(MemberInfo) mis = NULL;
+
+		{
+			size_t i = 0;
+			void *item;
+
+			while(hashmap_iter(members, &i, &item)) {
+				const MemberInfo *mi = item;
+
+				cvector_push_back(mis, *mi);
+			}
+
+		}
+
+		cg_print(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
+
+		if(choices > 1) {
+			cg_print(cg, "%sType tag, ", r.token1.lexeme);
+		}
+
+
+		for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+			for(int i = 0; i < it->numNamed + 1; i += 1) {
+				if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
+					cg_print(cg, "Token %s_%d", it->type, i);
+				} else {
+					cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+				}
+
+				if(i != it->numNamed) {
+					cg_print(cg, ", ");
+				}
+			}
+
+			if(it + 1 != cvector_end(mis)) {
 				cg_print(cg, ", ");
 			}
 		}
 
-		if(it + 1 != cvector_end(mis)) {
-			cg_print(cg, ", ");
-		}
+		cvector_free(mis);
+		cg_println(cg, ");");
 	}
-
-	cvector_free(mis);
-	cg_println(cg, ");");
 }
 
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, bool isUnion) {
-	cvector(MemberInfo) mis = NULL;
+static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+	if(choices > 1) {
+		for(size_t i = 0; i < choices; i += 1) {
+			cvector(MemberInfo) mis = NULL;
 
-	{
-		size_t i = 0;
-		void *item;
+			{
+				size_t j = 0;
+				void *item;
 
-		while(hashmap_iter(members, &i, &item)) {
-			const MemberInfo *mi = item;
+				while(hashmap_iter(members, &j, &item)) {
+					const MemberInfo *mi = item;
 
-			cvector_push_back(mis, *mi);
-		}
-
-	}
-
-	cg_print(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
-
-	if(isUnion) {
-		cg_print(cg, "%sType tag, ", r.token1.lexeme);
-	}
-
-	for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
-		for(int i = 0; i < it->numNamed + 1; i += 1) {
-			if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
-				cg_print(cg, "Token %s_%d", it->type, i);
-			} else {
-				cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+					if(mi->choice == i) {
+						cvector_push_back(mis, *mi);
+					}
+				}
 			}
 
-			if(i != it->numNamed) {
+			cg_print(cg, "struct %s *verbum_ast_new_%s_choice%zu(struct VerbumContext *ctx",
+					r.token1.lexeme, r.token1.lexeme, i);
+
+			for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+				cg_print(cg, ", ");
+
+				for(int i = 0; i < it->numNamed + 1; i += 1) {
+					if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
+						cg_print(cg, "Token %s_%d", it->type, i);
+					} else {
+						cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+					}
+
+					if(i < it->numNamed && it + 1 < cvector_end(mis)) {
+						cg_print(cg, ", ");
+					}
+				}
+			}
+
+			cg_println(cg, ") {");
+			cg_indent(cg);
+			cg_println(cg, "struct %s *result = ctx->memory.new(sizeof(*result));\n", r.token1.lexeme);
+			cg_newline(cg);
+			cg_println(cg, "if(result != NULL) {");
+			cg_indent(cg);
+
+			for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+				for(int i = 0; i < it->numNamed + 1; i += 1) {
+					if(it->isMultipleChoice) {
+						cg_println(cg, "result->choice%zu.%s_%d = %s_%d;", it->choice, it->type, i, it->type, i);
+					} else {
+						cg_println(cg, "result->%s_%d = %s_%d;", it->type, i, it->type, i);
+					}
+				}
+			}
+
+			cg_newline(cg);
+			cg_println(cg, "result->tag = %sType_%zu;", r.token1.lexeme, i);
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cg_newline(cg);
+			cg_println(cg, "return result;");
+			cg_unindent(cg);
+			cg_println(cg, "}");
+			cvector_free(mis);
+		}
+	} else {
+		cvector(MemberInfo) mis = NULL;
+
+		{
+			size_t i = 0;
+			void *item;
+
+			while(hashmap_iter(members, &i, &item)) {
+				const MemberInfo *mi = item;
+
+				cvector_push_back(mis, *mi);
+			}
+
+		}
+
+		cg_print(cg, "struct %s *verbum_ast_new_%s(struct VerbumContext *ctx, ", r.token1.lexeme, r.token1.lexeme);
+
+		if(choices > 1) {
+			cg_print(cg, "%sType tag, ", r.token1.lexeme);
+		}
+
+		for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+			for(int i = 0; i < it->numNamed + 1; i += 1) {
+				if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
+					cg_print(cg, "Token %s_%d", it->type, i);
+				} else {
+					cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
+				}
+
+				if(i != it->numNamed) {
+					cg_print(cg, ", ");
+				}
+			}
+
+			if(it + 1 != cvector_end(mis)) {
 				cg_print(cg, ", ");
 			}
 		}
 
-		if(it + 1 != cvector_end(mis)) {
-			cg_print(cg, ", ");
-		}
-	}
+		cg_println(cg, ") {");
+		cg_indent(cg);
+		cg_println(cg, "struct %s *result = ctx->memory.new(sizeof(*result));\n", r.token1.lexeme);
+		cg_newline(cg);
+		cg_println(cg, "if(result != NULL) {");
+		cg_indent(cg);
 
-	cg_println(cg, ") {");
-	cg_indent(cg);
-	cg_println(cg, "struct %s *result = ctx->memory.new(sizeof(*result));\n", r.token1.lexeme);
-	cg_newline(cg);
-	cg_println(cg, "if(result != NULL) {");
-	cg_indent(cg);
-
-	for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
-		for(int i = 0; i < it->numNamed + 1; i += 1) {
-			if(it->stat == MemberStat_Token) {
-				cg_println(cg, "result->%s_%d = %s_%d;", it->type, i, it->type, i);
-			} else {
-				cg_println(cg, "result->%s_%d = %s_%d;", it->type, i, it->type, i);
+		for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+			for(int i = 0; i < it->numNamed + 1; i += 1) {
+				if(it->isMultipleChoice) {
+					cg_println(cg, "result->choice%zu.%s_%d = %s_%d;",
+							it->choice, it->type, i, it->type, i);
+				} else {
+					cg_println(cg, "result->%s_%d = %s_%d;", it->type, i, it->type, i);
+				}
 			}
 		}
-	}
 
-	cg_unindent(cg);
-	cg_println(cg, "}");
-	cg_newline(cg);
-	cg_println(cg, "return result;");
-	cg_unindent(cg);
-	cg_println(cg, "}");
-	cvector_free(mis);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_newline(cg);
+		cg_println(cg, "return result;");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cvector_free(mis);
+	}
 }
 
 static void generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members) {
 	cg_println(cg, "void verbum_ast_delete_%s(struct VerbumContext *ctx, struct %s *d);", r.token1.lexeme, r.token1.lexeme);
 }
 
-static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
-	cg_println(cg, "void verbum_ast_delete_%s(struct VerbumContext *ctx, struct %s *%s) {", r.token1.lexeme, r.token1.lexeme, r.token1.lexeme);
+static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+	cg_println(cg, "void verbum_ast_delete_%s(struct VerbumContext *ctx, struct %s *%s) {",
+			r.token1.lexeme, r.token1.lexeme, r.token1.lexeme);
 	cg_indent(cg);
 
-	cvector(MemberInfo) mis = NULL;
+	if(choices > 1) {
+		cg_println(cg, "switch(%s->tag) {", r.token1.lexeme);
 
-	{
-		size_t i = 0;
-		void *item;
+		for(size_t i = 0; i < choices; i += 1) {
+			cvector(MemberInfo) mis = NULL;
 
-		while(hashmap_iter(members, &i, &item)) {
-			const MemberInfo *mi = item;
+			{
+				size_t j = 0;
+				void *item;
 
-			cvector_push_back(mis, *mi);
+				while(hashmap_iter(members, &j, &item)) {
+					const MemberInfo *mi = item;
+
+					if(mi->choice == i) {
+						cvector_push_back(mis, *mi);
+					}
+				}
+			}
+
+			cg_println(cg, "case %sType_%zu:", r.token1.lexeme, i);
+			cg_indent(cg);
+
+			for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
+				for(int i = 0; i < it->numNamed + 1; i += 1) {
+					if(it->stat != MemberStat_Token && it->stat != MemberStat_Literal) {
+						cg_println(cg, "verbum_ast_delete_%s(ctx, %s->choice%zu.%s_%d);",
+								it->type, r.token1.lexeme, it->choice, it->type, i);
+					}
+				}
+			}
+
+			cg_unindent(cg);
+			cg_println(cg, "break;");
+			cvector_free(mis);
+		}
+
+		cg_println(cg, "}");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+	} else {
+		cvector(MemberInfo) mis = NULL;
+
+		{
+			size_t i = 0;
+			void *item;
+
+			while(hashmap_iter(members, &i, &item)) {
+				const MemberInfo *mi = item;
+
+				cvector_push_back(mis, *mi);
+			}
 		}
 
 		for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
 			for(int i = 0; i < it->numNamed + 1; i += 1) {
 				if(it->stat != MemberStat_Token && it->stat != MemberStat_Literal) {
-					cg_println(cg, "ctx->memory.delete(%s->%s_%d);", r.token1.lexeme, it->type, i);
+					if(it->isMultipleChoice) {
+						cg_println(cg, "verbum_ast_delete_%s(ctx, %s->choice%zu.%s_%d);",
+								it->type, r.token1.lexeme, it->choice, it->type, i);
+					} else {
+						cg_println(cg, "verbum_ast_delete_%s(ctx, %s->%s_%d);",
+								it->type, r.token1.lexeme, it->type, i);
+					}
 				}
 			}
 		}
 
 		cvector_free(mis);
+		cg_println(cg, "ctx->memory.delete(%s);", r.token1.lexeme);
+		cg_unindent(cg);
+		cg_println(cg, "}");
 	}
-
-	cg_println(cg, "ctx->memory.delete(%s);", r.token1.lexeme);
-	cg_unindent(cg);
-	cg_println(cg, "}");
 }
 
 static void cg_generate_parser(CodeGenerator *cg) {
@@ -1355,7 +1480,7 @@ static void cg_generate_parser(CodeGenerator *cg) {
 	cg_close(cg);
 }
 
-static void generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
+static size_t generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
 	if(!cvector_empty(r.expression1->list2)) {
 		int offset = 0;
 		cg_println(cg, "typedef enum %c%sType {", r.token1.lexeme[0], r.token1.lexeme + 1);
@@ -1377,6 +1502,7 @@ static void generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashm
 		cg_unindent(cg);
 		cg_println(cg, "} %s;", r.token1.lexeme);
 
+		return cvector_size(r.expression1->list2) + 1;
 	} else {
 		cg_println(cg, "typedef struct %s {", r.token1.lexeme);
 		cg_indent(cg);
@@ -1384,12 +1510,14 @@ static void generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashm
 		cg_unindent(cg);
 		cg_println(cg, "} %s;", r.token1.lexeme);
 		cg_newline(cg);
+
+		return 1;
 	}
 }
 
 static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, struct hashmap *members) {
 	if(cvector_size(e.list2) == 0) {
-		cg_generate_ast_list(cg, r, e.list1, members);
+		cg_generate_ast_list(cg, r, e.list1, 0, false, members);
 	} else {
 		int offset = 0;
 
@@ -1397,7 +1525,7 @@ static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, 
 		cg_indent(cg);
 		cg_println(cg, "struct {");
 		cg_indent(cg);
-		cg_generate_ast_list(cg, r, e.list1, members); 
+		cg_generate_ast_list(cg, r, e.list1, offset, true, members); 
 		cg_unindent(cg);
 		cg_println(cg, "} choice%d;", offset);
 		offset += 1;
@@ -1405,7 +1533,7 @@ static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, 
 		for(List *it = cvector_begin(e.list2); it != cvector_end(e.list2); it += 1) {
 			cg_println(cg, "struct {");
 			cg_indent(cg);
-			cg_generate_ast_list(cg, r, *it, members); 
+			cg_generate_ast_list(cg, r, *it, offset, true, members); 
 			cg_unindent(cg);
 			cg_println(cg, "} choice%d;", offset);
 			offset += 1;
@@ -1416,24 +1544,26 @@ static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, 
 	}
 }
 
-static void cg_generate_ast_list(CodeGenerator *cg, Rule r, List l, struct hashmap *members) {
-	cg_generate_ast_term(cg, r, l.term1, members);
+static void cg_generate_ast_list(CodeGenerator *cg, Rule r, List l, size_t choice, bool isMultipleChoice, struct hashmap *members) {
+	cg_generate_ast_term(cg, r, l.term1, choice, isMultipleChoice, members);
 
 	for(Term *it = cvector_begin(l.term2); it != cvector_end(l.term2); it += 1) {
-		cg_generate_ast_term(cg, r, *it, members);
+		cg_generate_ast_term(cg, r, *it, choice, isMultipleChoice, members);
 	}
 }
 
-static void cg_generate_ast_term(CodeGenerator *cg, Rule r, Term t, struct hashmap *members) {
-	cg_generate_ast_factor(cg, r, t.factor1, members);
+static void cg_generate_ast_term(CodeGenerator *cg, Rule r, Term t, size_t choice, bool isMultipleChoice, struct hashmap *members) {
+	cg_generate_ast_factor(cg, r, t.factor1, choice, isMultipleChoice, members);
 }
 
-static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct hashmap *members) {
+static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, size_t choice, bool isMultipleChoice, struct hashmap *members) {
 	switch (f.tag) {
 	case FactorType_NonTerminal_Identifier: {
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = f.nonterminal_identifier.lexeme,
 					.stat = MemberStat_Pointer,
+					.choice = choice,
+					.isMultipleChoice = isMultipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1441,6 +1571,8 @@ static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct h
 						.numNamed = 0,
 						.stat = MemberStat_Pointer,
 						.type = f.nonterminal_identifier.lexeme,
+						.choice = choice,
+						.isMultipleChoice = isMultipleChoice,
 				};
 				hashmap_set(members, mi);
 				cg_println(cg, "struct %s *%s_%d;", 
@@ -1461,6 +1593,8 @@ static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct h
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = f.terminal_identifier.lexeme,
 					.stat = MemberStat_Token,
+					.choice = choice,
+					.isMultipleChoice = isMultipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1468,6 +1602,8 @@ static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct h
 						.numNamed = 0,
 						.stat = MemberStat_Token,
 						.type = f.terminal_identifier.lexeme,
+						.choice = choice,
+						.isMultipleChoice = isMultipleChoice,
 				};
 				hashmap_set(members, mi);
 				cg_println(cg, "Token %s_%d;", f.terminal_identifier.lexeme, mi->numNamed);
@@ -1487,6 +1623,8 @@ static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct h
 			const MemberInfo *mi = hashmap_get(members, &(MemberInfo) {
 					.type = "literal",
 					.stat = MemberStat_Literal,
+					.choice = choice,
+					.isMultipleChoice = isMultipleChoice,
 					});
 
 			if(mi == NULL) {
@@ -1494,6 +1632,8 @@ static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, struct h
 						.numNamed = 0,
 						.stat = MemberStat_Literal,
 						.type = "literal",
+						.choice = choice,
+						.isMultipleChoice = isMultipleChoice,
 				};
 				hashmap_set(members, mi);
 				cg_println(cg, "Token literal_%d;", mi->numNamed);
@@ -1525,7 +1665,7 @@ static int member_info_compare(const void *a, const void *b, void *udata) {
 	const MemberInfo *ua = a;
 	const MemberInfo *ub = b;
 
-	if(ua->stat == ub->stat) {
+	if(ua->stat == ub->stat && ua->choice == ub->choice && ua->isMultipleChoice == ub->isMultipleChoice) {
 		return strcmp(ua->type, ub->type);
 	}
 
