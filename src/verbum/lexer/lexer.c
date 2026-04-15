@@ -31,3 +31,7 @@ void lexer_delete(Lexer *l) {
 Token lexer_get_token(Lexer *l) {
 	return lexer_lex(l);
 }
+
+const char *lexer_get_source(Lexer *l) {
+	return utf8file_path(l->f);
+}

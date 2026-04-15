@@ -207,6 +207,8 @@ static void ast_print_expression(Expression e1) {
 			if(it->term1.factor1.tag != FactorType_Epsilon) {
 				printf("|");
 				ast_print_list(*it);
+			} else {
+				printf("| /\\ ");
 			}
 		}
 	}

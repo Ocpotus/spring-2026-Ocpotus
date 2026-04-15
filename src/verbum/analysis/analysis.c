@@ -648,7 +648,6 @@ static bool analyzer_analyze_anonymous_expression(Analyzer *a, HoistContext *hc)
 	analyzer_analyze_anonymous_expression_grammar(a, a->ast, NULL);
 
 	return true;
-
 }
 
 static bool analyzer_analyze_anonymous_expression_grammar(Analyzer *a, Grammar *g, HoistContext *hc) {
@@ -685,7 +684,6 @@ static bool analyzer_analyze_anonymous_expression_expression(Analyzer *a, Expres
 	}
 
 	return result;
-
 }
 
 static bool analyzer_analyze_anonymous_expression_list(Analyzer *a, List *l, HoistContext *hc) {
@@ -746,14 +744,44 @@ static bool analyzer_analyze_anonymous_expression_factor(Analyzer *a, Factor *f,
 
 	snprintf(s, nl + sl + 4, "%s%s%d", hc->ruleName.lexeme, suffix, count);
 
+	if(f->tag == FactorType_Repetition) {
+		Factor recursiveFactor = {
+			.tag = FactorType_NonTerminal_Identifier,
+			.nonterminal_identifier = {
+				.lexeme = memory_copy(s, strlen(s) + 1),
+				.type = TokenType_NonTerminal_Identifier
+			},
+		};
+
+		cvector_push_back(f->grouping->list1.term2, (Term){.factor1 = recursiveFactor});
+
+		for(List *it = cvector_begin(f->grouping->list2); it != cvector_end(f->grouping->list2); it += 1) {
+			Factor rf = {
+				.tag = FactorType_NonTerminal_Identifier,
+				.nonterminal_identifier = {
+					.lexeme = memory_copy(s, strlen(s) + 1),
+					.type = TokenType_NonTerminal_Identifier
+				},
+			};
+
+			cvector_push_back(it->term2, (Term){.factor1 = rf });
+		}
+	}
+
 	if(f->tag == FactorType_Optional || f->tag == FactorType_Repetition) {
 		List l = { 0 };
 		l.term1.factor1.tag = FactorType_Epsilon;
 		cvector_push_back(f->grouping->list2, l);
 	}
 
+	Rule r = {
+		.expression1 = f->grouping,
+		.token1 = {
+			.lexeme = s,
+			.type = TokenType_NonTerminal_Identifier
+		}
+	};
 
-	Rule r = { .expression1 = f->grouping, .token1 = { .lexeme = s, .type = TokenType_NonTerminal_Identifier} };
 	*f = (Factor) {
 		.nonterminal_identifier = (Token) {
 			.lexeme = memory_copy(s, strlen(s) + 1),

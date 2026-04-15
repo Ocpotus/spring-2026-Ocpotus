@@ -34,5 +34,7 @@ void lexer_delete(Lexer *l);
  */
 Token lexer_get_token(Lexer *l);
 
+const char *lexer_get_source(Lexer *l);
+
 
 #endif

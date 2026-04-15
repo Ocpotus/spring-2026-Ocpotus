@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "../../../lib/c-vector/cvector.h"
 
@@ -93,6 +94,32 @@ bool parser_errored(Parser *p) {
 	return p->error != NULL;
 }
 
+void parser_panic(Parser *p, const char *format, ...) {
+        va_list list;
+	struct Token t;
+
+        va_start(list, format);
+	fprintf(stderr, "Error! (%s) ", lexer_get_source(p->l));
+	vfprintf(stderr, format, list);
+        va_end(list);
+
+	if(parser_peek(p).type == TokenType_RightBrace) {
+		return;
+	}
+
+        t = parser_advance(p);
+
+        while(!parser_at_end(p)) {
+                if(parser_previous(p).type == TokenType_Semicolon || parser_previous(p).type == TokenType_Comma) {
+                        return;
+                }
+
+		token_delete(t);
+
+		t = parser_advance(p);
+        }
+}
+
 Grammar parser_parse_internal(Parser *p) {
 	return parser_parse_grammar(p);
 }
@@ -124,6 +151,8 @@ static Rule parser_parse_rule(Parser *p) {
 		Rule r = { 0 };
 
 		if(!parser_match(p, TokenType_Equal)) {
+			parser_set_error(p, "invalid token");
+			parser_panic(p, "expected '=' encountered '%s'", parser_current(p));
 			return (Rule) { 0 };
 		}
 
@@ -134,6 +163,8 @@ static Rule parser_parse_rule(Parser *p) {
 		}
 
 		if(!parser_match(p, TokenType_Semicolon)) {
+			parser_set_error(p, "invalid token");
+			parser_panic(p, "expected ';' encountered '%s'", parser_current(p));
 			return (Rule) { 0 };
 		}
 
@@ -245,6 +276,8 @@ static Factor parser_parse_factor(Parser *p) {
 		if(parser_match(p, TokenType_RightBracket)) {
 			return ast_new_factor4(e);
 		} else {
+			parser_set_error(p, "invalid token");
+			parser_panic(p, "expected ']', got %s", parser_current(p));
 			return (Factor) { 0 };
 		}
 	}
@@ -255,6 +288,8 @@ static Factor parser_parse_factor(Parser *p) {
 		if(parser_match(p, TokenType_RightBrace)) {
 			return ast_new_factor5(e);
 		} else {
+			parser_set_error(p, "invalid token");
+			parser_panic(p, "expected '{', got %s", parser_current(p));
 			return (Factor) { 0 };
 		}
 	}
@@ -266,6 +301,8 @@ static Factor parser_parse_factor(Parser *p) {
 			return ast_new_factor6(e);
 
 		} else {
+			parser_set_error(p, "invalid token");
+			parser_panic(p, "expected ')', got %s", parser_current(p));
 			return (Factor) { 0 };
 		}
 	}
