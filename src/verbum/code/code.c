@@ -32,30 +32,68 @@ static const char *verbum_utf8file_file_c = "utf8file.c";
 static const char *verbum_gperf_command_sh = "gperf -G -L ANSI-C -H verbum_token_hash -N verbum_token_in_language verbum_token.gperf > verbum_token.c";
 
 /* Generation functions */
-static void cg_generate_verbum(CodeGenerator *cg);
-static void cg_generate_tokens(CodeGenerator *cg);
-static void cg_generate_ast(CodeGenerator *cg);
-static void cg_generate_token_function(CodeGenerator *cg, Rule *r);
-static void cg_generate_lexer(CodeGenerator *cg);
 
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
-static void generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members);
-static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
+/*
+ * Generates the code for the verbum library.
+ */
+static void cg_generate_verbum(CodeGenerator *cg);
+/*
+ * Generates the code for tokens.
+ */
+static void cg_generate_tokens(CodeGenerator *cg);
+/*
+ * Generates the code for AST
+ */
+static void cg_generate_ast(CodeGenerator *cg);
+/*
+ * Generates the code for the lexer
+ */
+static void cg_generate_lexer(CodeGenerator *cg);
+/*
+ * Generates the code for the parser
+ */
 static void cg_generate_parser(CodeGenerator *cg);
-static void generate_repetition(CodeGenerator *cg, char c, size_t n);
-static void generate_indent(CodeGenerator *cg);
+
 
 /* CodeGenerator utilities */
+/*
+ * Opens a file.
+ *
+ * PARAMETERS:
+ * 	cg: CodeGenerator to set current file
+ * 	path: specified file
+ *
+ * RETURNS:
+ * 	true if successfully open, false otherwise
+ */
 static bool cg_open(CodeGenerator *cg, const char *path);
+/*
+ * Closes the currently open file.
+ *
+ * PARAMETERS:
+ * 	cg: CodeGenerator to unset file
+ *
+ * RETURNS:
+ * 	true if succesfully closed, false otherwise
+ */
 static bool cg_close(CodeGenerator *cg);
+/*
+ * Prints a character to the set file
+ *
+ * PARAMETERS:
+ * 	cg: CodeGenerator
+ * 	c: character to print
+ */
 static void cg_put(CodeGenerator *cg, const char c);
 static void cg_println(CodeGenerator *cg, const char *restrict format, ...);
 static void cg_print(CodeGenerator *cg, const char *restrict format, ...);
+static void cg_repeat(CodeGenerator *cg, char c, size_t n);
+static void cg_print_indent(CodeGenerator *cg);
 static inline void cg_newline(CodeGenerator *cg);
 static inline void cg_indent(CodeGenerator *cg);
 static inline void cg_unindent(CodeGenerator *cg);
 static void cg_print_lexeme(CodeGenerator *cg, Lexeme l);
+
 
 CodeGenerator code_generator_new(AST *ast, Rule start, struct hashmap *tokens, struct hashmap *firstFollowSets, struct hashmap *topterminals) {
 	return (CodeGenerator) {
@@ -135,7 +173,7 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 		cg_unindent(cg);
 		cg_println(cg, "} Token;");
 		cg_newline(cg);
-		cg_println(cg, "void token_delete(VerbumContext *ctx, Token t);");
+		cg_println(cg, "void verbum_token_delete(VerbumContext *ctx, Token *t);");
 		cg_newline(cg);
 		cg_println(cg, "const char *verbum_token_in_language(register const char *str, register size_t len);");
 		cg_println(cg, "TokenType verbum_token_get_keyword_type(const char *lexeme);");
@@ -173,6 +211,16 @@ static void cg_generate_tokens(CodeGenerator *cg) {
 		}
 
 		cg_println(cg, "%%%%");
+		cg_println(cg, "void verbum_token_delete(VerbumContext *ctx, Token *t) {");
+		cg_indent(cg);
+		cg_println(cg, "if(t->lexeme != NULL) {");
+		cg_indent(cg);
+		cg_println(cg, "ctx->memory.delete((void *) t->lexeme);");
+		cg_println(cg, "t->lexeme = NULL;");
+		cg_unindent(cg);
+		cg_println(cg, "}");
+		cg_unindent(cg);
+		cg_println(cg, "}");
 		cg_println(cg, "TokenType verbum_token_get_keyword_type(const char *lexeme) {");
 		cg_indent(cg);
 		cg_println(cg, "if(verbum_token_in_language(lexeme, strlen(lexeme)) != NULL) {");
@@ -217,11 +265,10 @@ static char *cg_generate_lexer_condition_factor(CodeGenerator *cg, Factor f);
 static void cg_generate_lexer_language_tokens(CodeGenerator *cg);
 static void cg_generate_lexer_language_token_lexeme(CodeGenerator *cg, const char *const root, const char *l, bool isSequence);
 static void cg_generate_lexer_rule(CodeGenerator *cg, Rule *r);
-static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e);
-static void cg_generate_lexer_list(CodeGenerator *cg, List *l);
-static void cg_generate_lexer_term(CodeGenerator *cg, Term *t);
-static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f);
-
+static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e, size_t choice, bool isMultipleChoice, size_t depth);
+static void cg_generate_lexer_list(CodeGenerator *cg, List *l, size_t choice, bool isMultipleChoice, size_t depth);
+static void cg_generate_lexer_term(CodeGenerator *cg, Term *t, size_t choice, bool isMultipleChoice, size_t depth);
+static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f, size_t choice, bool isMultipleChoice, size_t depth);
 
 
 static void cg_generate_lexer(CodeGenerator *cg) {
@@ -322,7 +369,7 @@ static void cg_generate_lexer(CodeGenerator *cg) {
 				char *condition = cg_generate_lexer_condition_rule(cg, it);
 
 				if(condition != NULL && *condition != '\0') {
-					generate_indent(cg);
+					cg_print_indent(cg);
 					cg_print(cg, "if(utf8chr(\"");
 					cg_print(cg, condition);
 					cg_print(cg, "\", c)) {\n");
@@ -383,22 +430,23 @@ static void cg_generate_lexer_language_token_lexeme(CodeGenerator *cg, const cha
 		return;
 	}
 
-	generate_indent(cg);
-	cg_print(cg, "if(lexer_current_character(l) == '");
+	cg_print_indent(cg);
+	cg_print(cg, "if(utf8chr(\"");
 
 	if(*(l) == '\\') {
 		cg_print(cg, "\\\\");
-	} else if(*(l) == '\'') {
-		cg_print(cg, "\\'");
+	} else if(*(l) == '\"') {
+		cg_print(cg, "\\\"");
 	} else {
 		cg_put(cg, *(l));
 	}
 
-	cg_print(cg, "') {");
+	cg_print(cg, "\", lexer_current_character(l))) {");
 	cg_newline(cg);
 	cg_indent(cg);
 	cg_println(cg, "lexer_advance(l);");
-	cg_println(cg, "result += 1;");
+	//cg_println(cg, "result += 1;");
+	cg_println(cg, "consumed += 1;");
 
 	if(!isSequence && l - root + 1 == strlen(root)) {
 		cg_println(cg, "goto EXIT;");
@@ -425,6 +473,7 @@ static void cg_generate_lexer_language_tokens(CodeGenerator *cg) {
 	cg_println(cg, "static size_t lexer_lex_builtin(Lexer *l) {");
 	cg_indent(cg);
 	cg_println(cg, "size_t result = 0;");
+	cg_println(cg, "size_t consumed = 0;");
 
 
 	while(hashmap_iter(cg->tokens, &i, &item)) {
@@ -437,6 +486,7 @@ static void cg_generate_lexer_language_tokens(CodeGenerator *cg) {
 	cg_print(cg, "EXIT:");
 	cg_newline(cg);
 
+	cg_println(cg, "result += consumed;");
 
 	cg_println(cg, "return result;");
 	cg_unindent(cg);
@@ -448,7 +498,7 @@ static void cg_generate_lexer_rule(CodeGenerator *cg, Rule *r) {
 	cg_indent(cg);
 	cg_println(cg, "size_t result = 0;");
 	cg_newline(cg);
-	cg_generate_lexer_expression(cg, r->expression1);
+	cg_generate_lexer_expression(cg, r->expression1, 0, !cvector_empty(r->expression1->list2), 0);
 	cg_newline(cg);
 	cg_print(cg, "EXIT:");
 	cg_newline(cg);
@@ -458,46 +508,57 @@ static void cg_generate_lexer_rule(CodeGenerator *cg, Rule *r) {
 	cg_newline(cg);
 }
 
-static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e) {
+static void cg_generate_lexer_expression(CodeGenerator *cg, Expression *e, size_t choice, bool isMultipleChoice, size_t depth) {
 	cg_println(cg, "size_t consumed = 0;");
 
-	/* if(!cvector_empty(e->list2)) {
-		size_t choice = 0; */
-
-		cg_println(cg, "if(result + consumed == result) {");
+	if(isMultipleChoice && e->list2 != NULL) {
+		cg_println(cg, "if(consumed == 0) {");
 		cg_indent(cg);
-		cg_generate_lexer_list(cg, &e->list1);
+	}
+
+	cg_generate_lexer_list(cg, &e->list1, choice, isMultipleChoice, depth);
+
+
+	if(isMultipleChoice && e->list2 != NULL) {
 		cg_unindent(cg);
 		cg_println(cg, "}");
+	}
 
-		for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
-			cg_println(cg, "if(result + consumed == result) {");
-			cg_indent(cg);
-			cg_generate_lexer_list(cg, it);
-			cg_unindent(cg);
-			cg_println(cg, "}");
-		}
-
-	/* } else {
-		cg_generate_lexer_list(cg, &e->list1);
-	} */
+	for(List *it = cvector_begin(e->list2); it != cvector_end(e->list2); it += 1) {
+		cg_println(cg, "if(consumed == 0) {");
+		cg_indent(cg);
+		cg_generate_lexer_list(cg, it, choice, !cvector_empty(e->list2), depth);
+		cg_unindent(cg);
+		cg_println(cg, "}");
+	}
 
 	cg_println(cg, "result += consumed;");
 }
 
-static void cg_generate_lexer_list(CodeGenerator *cg, List *l) {
-	cg_generate_lexer_term(cg, &l->term1);
+static void cg_generate_lexer_list(CodeGenerator *cg, List *l, size_t choice, bool isMultipleChoice, size_t depth) {
+	cg_generate_lexer_term(cg, &l->term1, choice, isMultipleChoice, depth);
 
 	for(Term *it = cvector_begin(l->term2); it != cvector_end(l->term2); it += 1) {
-		cg_generate_lexer_term(cg, it);
+		if(isMultipleChoice) {
+			cg_println(cg, "if(consumed != 0) {");
+			cg_indent(cg);
+		}
+
+		cg_generate_lexer_term(cg, it, choice, isMultipleChoice, depth);
+
+		if(isMultipleChoice) {
+			cg_unindent(cg);
+			cg_println(cg, "}");
+		}
 	}
+
 }
 
-static void cg_generate_lexer_term(CodeGenerator *cg, Term *t) {
-	cg_generate_lexer_factor(cg, &t->factor1);
+static void cg_generate_lexer_term(CodeGenerator *cg, Term *t, size_t choice, bool isMultipleChoice, size_t depth) {
+	cg_generate_lexer_factor(cg, &t->factor1, choice, isMultipleChoice, depth);
 }
 
-static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f) {
+static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f, size_t choice, bool isMultipleChoice, size_t depth) {
 	switch(f->tag) {
 	case FactorType_Literal: {
 			cg_generate_lexer_language_token_lexeme(cg, f->literal.lexeme, f->literal.lexeme, true);
@@ -510,7 +571,7 @@ static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f) {
 			cvector(char) condition = cg_generate_lexer_condition_expression(cg, *f->optional);
 			cg_println(cg, "if(utf8chr(\"%s\", lexer_current_character(l))) {", condition);
 			cg_indent(cg);
-			cg_generate_lexer_expression(cg, f->optional);
+			cg_generate_lexer_expression(cg, f->optional, choice, isMultipleChoice, depth + 1);
 			cg_unindent(cg);
 			cg_println(cg, "}");
 			cvector_free(condition);
@@ -519,7 +580,7 @@ static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f) {
 	case FactorType_Grouping:
 		cg_println(cg, "{");
 		cg_indent(cg);
-		cg_generate_lexer_expression(cg, f->grouping);
+		cg_generate_lexer_expression(cg, f->grouping, choice, isMultipleChoice, depth + 1);
 		cg_unindent(cg);
 		cg_println(cg, "}");
 		break;
@@ -527,7 +588,7 @@ static void cg_generate_lexer_factor(CodeGenerator *cg, Factor *f) {
 			cvector(char) condition = cg_generate_lexer_condition_expression(cg, *f->repetition);
 			cg_println(cg, "while(utf8chr(\"%s\", lexer_current_character(l))) {", condition);
 			cg_indent(cg);
-			cg_generate_lexer_expression(cg, f->repetition);
+			cg_generate_lexer_expression(cg, f->repetition, choice, isMultipleChoice, depth + 1);
 			cg_unindent(cg);
 			cg_println(cg, "}");
 			cvector_free(condition);
@@ -727,11 +788,15 @@ typedef struct MemberInfo {
 static uint64_t member_info_hash(const void *item, uint64_t seed0, uint64_t seed1);
 static int member_info_compare(const void *a, const void *b, void *udata);
 
-static size_t generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
+static size_t cg_generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members);
 static void cg_generate_ast_expression(CodeGenerator *cg, Rule r, Expression e, struct hashmap *members);
 static void cg_generate_ast_list(CodeGenerator *cg, Rule r, List l, size_t choice, bool isMultipleChoice, struct hashmap *members);
 static void cg_generate_ast_term(CodeGenerator *cg, Rule r, Term t, size_t choice, bool isMultipleChoice, struct hashmap *members);
 static void cg_generate_ast_factor(CodeGenerator *cg, Rule r, Factor f, size_t choice, bool isMultipleChoice, struct hashmap *members);
+static void cg_generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
+static void cg_generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
+static void cg_generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members);
+static void cg_generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices);
 
 // This function is dumb... it opens h file writes and closes then opens c file writes and closes and repeats.
 // but it suffices for now
@@ -773,13 +838,13 @@ static void cg_generate_ast(CodeGenerator *cg) {
 						  member_info_hash, member_info_compare, NULL, NULL);
 
 			cg->fp = fopen(verbum_ast_file_h, "a");
-			size_t count = generate_ast_rule_definition(cg, *it, members);
-			generate_ast_rule_function_new_signature(cg, *it, members, count);
-			generate_ast_rule_function_delete_signature(cg, *it, members);
+			size_t count = cg_generate_ast_rule_definition(cg, *it, members);
+			cg_generate_ast_rule_function_new_signature(cg, *it, members, count);
+			cg_generate_ast_rule_function_delete_signature(cg, *it, members);
 			fclose(cg->fp);
 			cg->fp = fopen(verbum_ast_file_c, "a");
-			generate_ast_rule_function_new_definition(cg, *it, members, count);
-			generate_ast_rule_function_delete_definition(cg, *it, members, count);
+			cg_generate_ast_rule_function_new_definition(cg, *it, members, count);
+			cg_generate_ast_rule_function_delete_definition(cg, *it, members, count);
 			fclose(cg->fp);
 			hashmap_free(members);
 		}
@@ -895,7 +960,7 @@ EXIT:
 	return result;
 }
 
-static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+static void cg_generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
 	if(choices > 1) {
 		for(size_t choice = 0; choice < choices; choice += 1) {
 			cvector(MemberInfo) mis = NULL;
@@ -979,7 +1044,7 @@ static void generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule r, 
 	}
 }
 
-static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+static void cg_generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
 	if(choices > 1) {
 		for(size_t i = 0; i < choices; i += 1) {
 			cvector(MemberInfo) mis = NULL;
@@ -1110,11 +1175,11 @@ static void generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule r,
 	}
 }
 
-static void generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members) {
+static void cg_generate_ast_rule_function_delete_signature(CodeGenerator *cg, Rule r, struct hashmap *members) {
 	cg_println(cg, "void verbum_ast_delete_%s(struct VerbumContext *ctx, struct %s *d);", r.token1.lexeme, r.token1.lexeme);
 }
 
-static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
+static void cg_generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule r, struct hashmap *members, size_t choices) {
 	cg_println(cg, "void verbum_ast_delete_%s(struct VerbumContext *ctx, struct %s *%s) {",
 			r.token1.lexeme, r.token1.lexeme, r.token1.lexeme);
 	cg_indent(cg);
@@ -1143,7 +1208,10 @@ static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule
 
 			for(MemberInfo *it = cvector_begin(mis); it != cvector_end(mis); it += 1) {
 				for(int i = 0; i < it->numNamed + 1; i += 1) {
-					if(it->stat != MemberStat_Token && it->stat != MemberStat_Literal) {
+					if(it->stat == MemberStat_Token || it->stat == MemberStat_Literal) {
+						cg_println(cg, "verbum_token_delete(ctx, &%s->choice%zu.%s_%d);",
+								r.token1.lexeme, it->choice, it->type, i);
+					} else if(it->stat != MemberStat_Token && it->stat != MemberStat_Literal) {
 						cg_println(cg, "verbum_ast_delete_%s(ctx, %s->choice%zu.%s_%d);",
 								it->type, r.token1.lexeme, it->choice, it->type, i);
 					}
@@ -1156,6 +1224,7 @@ static void generate_ast_rule_function_delete_definition(CodeGenerator *cg, Rule
 		}
 
 		cg_println(cg, "}");
+		cg_println(cg, "ctx->memory.delete(%s);", r.token1.lexeme);
 		cg_unindent(cg);
 		cg_println(cg, "}");
 	} else {
@@ -1310,7 +1379,7 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule r, Expression 
 		cg_newline(cg);
 		//cg_println(cg, "result = verbum_ast_new_%s_choice%zu(ctx, )");
 		cg_newline(cg);
-		generate_indent(cg);
+		cg_print_indent(cg);
 		cg_print(cg, "result = verbum_ast_new_%s_choice%zu(p->ctx", r.token1.lexeme, choice);
 		cg_generate_new_call(cg, r, mems);
 		cg_print(cg, ");");
@@ -1331,7 +1400,7 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule r, Expression 
 			cg_indent(cg);
 			cg_generate_parser_list(cg, r, *it, choice, true, mems);
 			cg_newline(cg);
-			generate_indent(cg);
+			cg_print_indent(cg);
 			cg_print(cg, "result = verbum_ast_new_%s_choice%zu(p->ctx", r.token1.lexeme, choice);
 			cg_generate_new_call(cg, r, mems);
 			cg_print(cg, ");");
@@ -1347,7 +1416,7 @@ static void cg_generate_parser_expression(CodeGenerator *cg, Rule r, Expression 
 		}
 	} else {
 		cg_generate_parser_list(cg, r, e.list1, 0, false, mems);
-		generate_indent(cg);
+		cg_print_indent(cg);
 		cg_print(cg, "result = verbum_ast_new_%s(p->ctx", r.token1.lexeme);
 		cg_generate_new_call(cg, r, mems);
 		cg_print(cg, ");");
@@ -1469,6 +1538,7 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule r, Factor f, size_
 			cg_unindent(cg);
 			cg_println(cg, "}");
 			cg_println(cg, "Token %s_%zu = parser_previous(p);", f.terminal_identifier.lexeme, mi->numNamed);
+			cg_println(cg, "parser_drop(p);");
 		}
 		break;
 	case FactorType_Literal: {
@@ -1516,6 +1586,7 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule r, Factor f, size_
 			cg_unindent(cg);
 			cg_println(cg, "}");
 			cg_println(cg, "Token literal_%zu = parser_previous(p);", mi->numNamed);
+			cg_println(cg, "parser_drop(p);");
 		}
 		break;
 	default:
@@ -1524,7 +1595,7 @@ static void cg_generate_parser_factor(CodeGenerator *cg, Rule r, Factor f, size_
 
 }
 
-static size_t generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
+static size_t cg_generate_ast_rule_definition(CodeGenerator *cg, Rule r, struct hashmap *members) {
 	if(!cvector_empty(r.expression1->list2)) {
 		int offset = 0;
 		cg_println(cg, "typedef enum %c%sType {", r.token1.lexeme[0], r.token1.lexeme + 1);
@@ -1717,22 +1788,22 @@ static int member_info_compare(const void *a, const void *b, void *udata) {
 }
 
 /* Utilities */
-static void generate_repetition(CodeGenerator *cg, char c, size_t n) {
+static void cg_repeat(CodeGenerator *cg, char c, size_t n) {
 	while(n != 0) {
 		fputc(c, cg->fp);
 		n -= 1;
 	}
 }
 
-static void generate_indent(CodeGenerator *cg) {
-	generate_repetition(cg, '\t', cg->indent);
+static void cg_print_indent(CodeGenerator *cg) {
+	cg_repeat(cg, '\t', cg->indent);
 }
 
 static void cg_println(CodeGenerator *cg, const char *restrict format, ...) {
 	va_list args;
 
 	va_start(args, format);
-	generate_indent(cg);
+	cg_print_indent(cg);
 	vfprintf(cg->fp, format, args);
 	fputc('\n', cg->fp);
 	va_end(args);

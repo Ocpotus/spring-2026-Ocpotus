@@ -770,6 +770,7 @@ static bool analyzer_analyze_anonymous_expression_factor(Analyzer *a, Factor *f,
 
 	if(f->tag == FactorType_Optional || f->tag == FactorType_Repetition) {
 		List l = { 0 };
+
 		l.term1.factor1.tag = FactorType_Epsilon;
 		cvector_push_back(f->grouping->list2, l);
 	}
@@ -854,6 +855,10 @@ static int first_follow_set_compare(const void *a, const void *b, void *udata) {
 }
 
 static void set_union(struct hashmap *d, struct hashmap *s) {
+	if(d == s) {
+		return;
+	}
+
 	size_t i = 0;
 	void *item;
 
