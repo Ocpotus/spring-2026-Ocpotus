@@ -10,7 +10,6 @@
 !config.toml
 
 # Test directories
-test/
-test/**
-
+!test/
+!test/**
 # Extra

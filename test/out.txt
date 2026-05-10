@@ -1,0 +1,91 @@
+grammar 0
+= 16
+{ 17
+rule 0
+} 7
+; 21
+rule 0
+= 16
+( 9
+$NONTERMINAL_IDENTIFIER 1
+| 12
+$TERMINAL_IDENTIFIER 1
+) 20
+, 15
+"=" , expression , ";" ; 2
+expression 0
+= 16
+list 0
+, 15
+{ 17
+"|" , list } ; 2
+list 0
+= 16
+term 0
+, 15
+{ 17
+"," , term } ; 2
+term 0
+= 16
+factor 0
+, 15
+[ 11
+"-" , factor ] ; 2
+factor 0
+= 16
+$NONTERMINAL_IDENTIFIER 1
+| 12
+$TERMINAL_IDENTIFIER 1
+| 12
+$LITERAL 1
+| 12
+"[" , expression , "]" 2
+| 12
+"{" , expression , "}" 2
+| 12
+"(" , expression , ")" 2
+; 21
+$NONTERMINAL_IDENTIFIER 1
+= 16
+( 9
+$LETTER 1
+| 12
+"_" ) , { $LETTER | $DIGIT | "_" } ; 2
+$TERMINAL_IDENTIFIER 1
+= 16
+"$" , ( $LETTER | "_" ) , { $LETTER | $DIGIT | "_" } ; 2
+$LITERAL 1
+= 16
+"'" , { $CHARACTER - " 2
+'" } , "'"  2
+| 12
+'"' , { $CHARACTER - '"' } , '"' 2
+; 21
+$LETTER 1
+= 16
+"A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" 2
+| 12
+"N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" 2
+| 12
+"a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" 2
+| 12
+"n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ; 2
+$DIGIT 1
+= 16
+"0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ; 2
+$SYMBOL 1
+= 16
+"`" | "~" | "!" | "@" | "#" | "$" | "%" | "^" | "&" | "*" | "(" | ")" | "_" 2
+| 12
+"-" | "+" | "=" | "{" | "}" | "[" | "]" | ":" | ";" | "<" | ">" | "," | "." 2
+| 12
+"?" | "/" | "|" | "\" | "'" | '"' | " 2
+" ; 2
+$CHARACTER 1
+= 16
+$LETTER 1
+| 12
+$DIGIT 1
+| 12
+$SYMBOL 1
+; 21

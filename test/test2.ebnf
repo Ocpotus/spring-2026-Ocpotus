@@ -1,0 +1,6 @@
+p		= [ "h" ] , q , n ;
+q		= "ello" ;
+n		= ( f , " " , l) | f ;
+f		= "John" | "Jane" ;
+l		= "Doe" | f ;
+

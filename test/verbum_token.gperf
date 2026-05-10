@@ -1,0 +1,43 @@
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#include "verbum.h"
+#include "verbum_token.h"
+%}
+%%
+"["
+"="
+"-"
+"{"
+"("
+"]"
+";"
+"|"
+"}"
+","
+")"
+%%
+void verbum_token_delete(VerbumContext *ctx, Token *t) {
+	if(t->lexeme != NULL) {
+		ctx->memory.delete((void *) t->lexeme);
+		t->lexeme = NULL;
+	}
+}
+TokenType verbum_token_get_keyword_type(const char *lexeme) {
+	if(verbum_token_in_language(lexeme, strlen(lexeme)) != NULL) {
+		return verbum_token_hash(lexeme, strlen(lexeme)) + TokenType_Keyword;
+	}
+
+	return TokenType_Invalid;
+}
+
+TokenType verbum_token_get_lexeme_type(const char *lexeme) {
+	if(verbum_token_in_language(lexeme, strlen(lexeme)) != NULL) {
+		return verbum_token_hash(lexeme, strlen(lexeme)) + TokenType_Keyword;
+	}
+
+	return verbum_token_hash(lexeme, strlen(lexeme));
+}
