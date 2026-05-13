@@ -12,13 +12,8 @@ typedef enum TokenType {
 	TokenType_Invalid = -3,
 	TokenType_Whitespace = -2,
 	TokenType_EOF = -1,
-	TokenType_NONTERMINAL_IDENTIFIER,
-	TokenType_TERMINAL_IDENTIFIER,
-	TokenType_LITERAL,
-	TokenType_LETTER,
+	TokenType_NUMBER,
 	TokenType_DIGIT,
-	TokenType_SYMBOL,
-	TokenType_CHARACTER,
 	TokenType_Keyword,
 } TokenType;
 

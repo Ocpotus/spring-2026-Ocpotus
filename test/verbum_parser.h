@@ -171,6 +171,6 @@ void parser_reset_error(Parser *p);
 
 bool parser_errored(Parser *p);
 
-grammar *parser_parse_internal(Parser *p);
+start *parser_parse_internal(Parser *p);
 #endif
 

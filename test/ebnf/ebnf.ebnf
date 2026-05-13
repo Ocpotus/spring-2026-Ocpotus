@@ -1,4 +1,4 @@
-grammar        			= { rule | $COMMENT } ;
+grammar        			= { rule } ;
 rule           			= ( $NONTERMINAL_IDENTIFIER | $TERMINAL_IDENTIFIER ) , "=" , expression , ";" ;
 expression     			= list , { "|" , list } ;
 list           			= term , { "," , term } ;

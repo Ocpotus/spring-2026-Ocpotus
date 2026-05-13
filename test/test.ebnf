@@ -1,0 +1,5 @@
+if_statement   		= "if" , expression , "then" , expression , "end" ;
+expression     		= binary_expression | constant ;
+binary_expression 	= constant , ( ">" | "+" ) , expression ;
+constant		= "1" | "2" ;
+

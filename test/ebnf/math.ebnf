@@ -1,0 +1,7 @@
+start		= expression ;
+expression	= term , [ "+" | "-" ] , expression ;
+term		= factor , [ "*" | "/" ] , term ;
+factor		= $NUMBER ;
+
+$NUMBER		= $DIGIT , { $DIGIT } ;
+$DIGIT		= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;

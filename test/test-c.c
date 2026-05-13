@@ -11,7 +11,6 @@
 #include "verbum_ast.h"
 
 
-
 //memory
 void *new(size_t n) {
 	return malloc(n);
@@ -179,11 +178,6 @@ void p_gr0(grammarRepetition0 *gr0) {
 		p_gr0(gr0->choice0.grammarRepetition0_0);
 		break;
 	case grammarRepetition0Type_1:
-		printf("%s", gr0->choice1.COMMENT_0.lexeme);
-		printf("\n");
-		p_gr0(gr0->choice1.grammarRepetition0_0);
-		break;
-	case grammarRepetition0Type_2:
 		break;
 	default:
 		break;
@@ -215,9 +209,9 @@ int main() {
 	};
 
 
-	/* Parser *p = parser_new(&vc, "ebnf.ebnf");
+	/* Parser *p = parser_new(&vc, "test.c");
 	AST *a = parser_parse(p);
-	print(a);
+	//print(a);
 	parser_delete(p);
 	verbum_ast_delete_grammar(&vc, a);
 	putchar('\n'); */
