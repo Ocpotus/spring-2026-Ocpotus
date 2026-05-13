@@ -170,12 +170,23 @@ void lexer_report_error(Lexer *l, uint32_t c) {
 	fprintf(stderr, "%s: (%d:%d) unrecognized token '%lc'\n", l->path, l->pos.row, l->pos.col, c);
 }
 
-static size_t lexer_lex_NUMBER(Lexer *l);
+static size_t lexer_lex_NONTERMINAL_IDENTIFIER(Lexer *l);
+static size_t lexer_lex_TERMINAL_IDENTIFIER(Lexer *l);
+static size_t lexer_lex_LITERAL(Lexer *l);
+static size_t lexer_lex_LETTER(Lexer *l);
 static size_t lexer_lex_DIGIT(Lexer *l);
+static size_t lexer_lex_SYMBOL(Lexer *l);
+static size_t lexer_lex_CHARACTER(Lexer *l);
 static size_t lexer_lex_builtin(Lexer *l) {
 	size_t result = 0;
 	size_t consumed = 0;
-	if(utf8chr("*", lexer_current_character(l))) {
+	if(utf8chr("[", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("=", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
@@ -187,13 +198,49 @@ static size_t lexer_lex_builtin(Lexer *l) {
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr("/", lexer_current_character(l))) {
+	if(utf8chr("{", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr("+", lexer_current_character(l))) {
+	if(utf8chr("(", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("]", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr(";", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("|", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("}", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr(",", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr(")", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
@@ -253,8 +300,8 @@ Token lexer_lex(Lexer *l) {
 
 		return result;
 	}
-	if(utf8chr("5327041896", c)) {
-		size_t length = lexer_lex_NUMBER(l);
+	if(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC_", c)) {
+		size_t length = lexer_lex_NONTERMINAL_IDENTIFIER(l);
 
 		if(length != 0) {
 			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
@@ -265,7 +312,47 @@ Token lexer_lex(Lexer *l) {
 			}
 
 			result = (Token) {
-				.tag = TokenType_NUMBER,
+				.tag = TokenType_NONTERMINAL_IDENTIFIER,
+				.lexeme = lexeme,
+				.pos = { 0 },
+			};
+
+			return result;
+		}
+	}
+	if(utf8chr("$", c)) {
+		size_t length = lexer_lex_TERMINAL_IDENTIFIER(l);
+
+		if(length != 0) {
+			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
+
+			if(lexeme == NULL) {
+				// Error
+				return result;
+			}
+
+			result = (Token) {
+				.tag = TokenType_TERMINAL_IDENTIFIER,
+				.lexeme = lexeme,
+				.pos = { 0 },
+			};
+
+			return result;
+		}
+	}
+	if(utf8chr("\"'", c)) {
+		size_t length = lexer_lex_LITERAL(l);
+
+		if(length != 0) {
+			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
+
+			if(lexeme == NULL) {
+				// Error
+				return result;
+			}
+
+			result = (Token) {
+				.tag = TokenType_LITERAL,
 				.lexeme = lexeme,
 				.pos = { 0 },
 			};
@@ -279,15 +366,504 @@ Token lexer_lex(Lexer *l) {
 
 	return result;
 }
-static size_t lexer_lex_NUMBER(Lexer *l) {
+static size_t lexer_lex_NONTERMINAL_IDENTIFIER(Lexer *l) {
 	size_t result = 0;
 
 	size_t consumed = 0;
-	consumed += lexer_lex_DIGIT(l);
-	while(utf8chr("5327041896", lexer_current_character(l))) {
+	{
 		size_t consumed = 0;
-		consumed += lexer_lex_DIGIT(l);
+		consumed += lexer_lex_LETTER(l);
+		if(consumed == 0) {
+			if(utf8chr("_", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
 		result += consumed;
+	}
+	while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896_", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_LETTER(l);
+		if(consumed == 0) {
+			consumed += lexer_lex_DIGIT(l);
+		}
+		if(consumed == 0) {
+			if(utf8chr("_", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_TERMINAL_IDENTIFIER(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("$", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	{
+		size_t consumed = 0;
+		consumed += lexer_lex_LETTER(l);
+		if(consumed == 0) {
+			if(utf8chr("_", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896_", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_LETTER(l);
+		if(consumed == 0) {
+			consumed += lexer_lex_DIGIT(l);
+		}
+		if(consumed == 0) {
+			if(utf8chr("_", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_LITERAL(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("'", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed != 0) {
+			while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896[=-{/#_\"($^`;&%<, )+>:\\?.~*!]}|@", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_CHARACTER(l);
+				result += consumed;
+			}
+		}
+		if(consumed != 0) {
+			if(utf8chr("'", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("\"", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed != 0) {
+			while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896'[=-{/#_\($^`;&%<, )+>:\\?.~*!]}|@", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_CHARACTER(l);
+				result += consumed;
+			}
+		}
+		if(consumed != 0) {
+			if(utf8chr("\"", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_LETTER(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("A", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("B", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("C", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("D", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("E", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("F", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("G", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("H", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("I", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("J", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("K", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("M", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("N", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("O", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("P", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("Q", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("R", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("S", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("T", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("U", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("V", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("W", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("X", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("Y", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("Z", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("a", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("b", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("c", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("d", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("e", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("f", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("g", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("h", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("i", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("j", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("k", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("l", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("m", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("n", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("p", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("q", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("r", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("s", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("t", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("u", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("v", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("w", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("x", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("y", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("z", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
 	}
 	result += consumed;
 
@@ -368,6 +944,266 @@ static size_t lexer_lex_DIGIT(Lexer *l) {
 			consumed += 1;
 		} else {
 		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_SYMBOL(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("`", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("~", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("!", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("@", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("#", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("$", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("%", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("^", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("&", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("*", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("(", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(")", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("_", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("-", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("+", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("{", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("}", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("[", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("]", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(":", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(";", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("<", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(">", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(",", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(".", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("?", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("/", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("|", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("\\", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("'", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("\"", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr(" ", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_CHARACTER(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		consumed += lexer_lex_LETTER(l);
+	}
+	if(consumed == 0) {
+		consumed += lexer_lex_DIGIT(l);
+	}
+	if(consumed == 0) {
+		consumed += lexer_lex_SYMBOL(l);
 	}
 	result += consumed;
 

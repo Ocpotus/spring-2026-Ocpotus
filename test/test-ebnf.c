@@ -209,7 +209,7 @@ int main() {
 	};
 
 
-	Parser *p = parser_new(&vc, "test.ebnf");
+	Parser *p = parser_new(&vc, "ebnf/c.ebnf");
 	AST *a = parser_parse(p);
 	print(a);
 	parser_delete(p);

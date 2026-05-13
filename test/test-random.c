@@ -215,7 +215,7 @@ int main() {
 	parser_delete(p);
 	verbum_ast_delete_grammar(&vc, a);
 	putchar('\n'); */
-	Lexer *l = lexer_new(&vc, "test.c");
+	Lexer *l = lexer_new(&vc, "test.random");
 	Token t = { 0 };
 
 	do {

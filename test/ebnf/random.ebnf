@@ -1,0 +1,10 @@
+sentence = greeting , [ question ] , name ;
+greeting = $NEUTRAL | $LOUD ;
+question = $MORNING | $EVENING ;
+name = $FIRST , [ "Doe" ] ;
+
+$NEUTRAL = "Hi" | "Hello" ;
+$LOUD = "BAM!" | "WHAM!" ;
+$MORNING = "Morning?" | "Morn." ;
+$EVENING = "Evenin" | "Night" ;
+$FIRST = "John" | "Jane" ;

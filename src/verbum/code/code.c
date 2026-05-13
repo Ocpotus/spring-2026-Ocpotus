@@ -990,7 +990,7 @@ static void cg_generate_ast_rule_function_new_signature(CodeGenerator *cg, Rule 
 						cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
 					}
 
-					if(i < it->numNamed && it + 1 != cvector_end(mis)) {
+					if(i < it->numNamed) {
 						cg_print(cg, ", ");
 
 					}
@@ -1075,8 +1075,9 @@ static void cg_generate_ast_rule_function_new_definition(CodeGenerator *cg, Rule
 						cg_print(cg, "struct %s *%s_%d", it->type, it->type, i);
 					}
 
-					if(i < it->numNamed && it + 1 < cvector_end(mis)) {
+					if(i < it->numNamed) {
 						cg_print(cg, ", ");
+
 					}
 				}
 			}

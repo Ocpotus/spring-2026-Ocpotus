@@ -8,10 +8,17 @@
 #include "verbum_token.h"
 %}
 %%
-"*"
+"["
+"="
 "-"
-"/"
-"+"
+"{"
+"("
+"]"
+";"
+"|"
+"}"
+","
+")"
 %%
 void verbum_token_delete(VerbumContext *ctx, Token *t) {
 	if(t->lexeme != NULL) {
