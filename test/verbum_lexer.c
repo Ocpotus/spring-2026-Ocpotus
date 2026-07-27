@@ -170,20 +170,1319 @@ void lexer_report_error(Lexer *l, uint32_t c) {
 	fprintf(stderr, "%s: (%d:%d) unrecognized token '%lc'\n", l->path, l->pos.row, l->pos.col, c);
 }
 
-static size_t lexer_lex_NONTERMINAL_IDENTIFIER(Lexer *l);
-static size_t lexer_lex_TERMINAL_IDENTIFIER(Lexer *l);
-static size_t lexer_lex_LITERAL(Lexer *l);
+static size_t lexer_lex_IDENTIFIER(Lexer *l);
 static size_t lexer_lex_LETTER(Lexer *l);
 static size_t lexer_lex_DIGIT(Lexer *l);
 static size_t lexer_lex_SYMBOL(Lexer *l);
-static size_t lexer_lex_CHARACTER(Lexer *l);
+static size_t lexer_lex_INTEGER_CONSTANT(Lexer *l);
+static size_t lexer_lex_DECIMAL_CONSTANT(Lexer *l);
+static size_t lexer_lex_OCTAL_CONSTANT(Lexer *l);
+static size_t lexer_lex_HEX_CONSTANT(Lexer *l);
+static size_t lexer_lex_HEX_DIGIT(Lexer *l);
+static size_t lexer_lex_INTEGER_SUFFIX(Lexer *l);
+static size_t lexer_lex_CHARACTER_CONSTANT(Lexer *l);
+static size_t lexer_lex_C_CHAR(Lexer *l);
+static size_t lexer_lex_FLOATING_CONSTANT(Lexer *l);
+static size_t lexer_lex_FRACTIONAL_CONSTANT(Lexer *l);
+static size_t lexer_lex_EXPONENT_PART(Lexer *l);
+static size_t lexer_lex_DIGIT_SEQUENCE(Lexer *l);
+static size_t lexer_lex_FLOAT_SUFFIX(Lexer *l);
+static size_t lexer_lex_ENUMERATION_CONSTANT(Lexer *l);
+static size_t lexer_lex_STRING(Lexer *l);
+static size_t lexer_lex_STRING_CHARACTER(Lexer *l);
+static size_t lexer_lex_ESCAPE_SEQUENCE(Lexer *l);
+static size_t lexer_lex_OCTAL_ESCAPE(Lexer *l);
+static size_t lexer_lex_OCTAL_DIGIT(Lexer *l);
+static size_t lexer_lex_HEX_ESCAPE(Lexer *l);
 static size_t lexer_lex_builtin(Lexer *l) {
 	size_t result = 0;
 	size_t consumed = 0;
-	if(utf8chr("[", lexer_current_character(l))) {
+	if(utf8chr("v", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("l", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("a", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("t", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("i", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("l", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								if(utf8chr("e", lexer_current_character(l))) {
+									lexer_advance(l);
+									consumed += 1;
+									goto EXIT;
+								} else {
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+								}
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("a", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("u", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("o", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("w", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("h", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("i", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("l", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("e", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(".", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr(".", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr(".", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("{", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
+	} else {
+	}
+	if(utf8chr("d", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("u", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("b", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("l", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("e", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("c", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("a", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("s", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("e", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("f", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("r", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("-", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr(">", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("i", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("z", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("e", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("o", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("f", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(">", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(",", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr(">", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr(">", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("=", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(">", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr(">", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("r", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("e", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("u", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("r", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("n", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("?", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("v", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("i", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("d", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("e", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("n", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("u", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("m", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("c", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("h", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("a", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("r", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("%", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("}", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("*", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("t", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("r", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("u", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("c", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("t", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("g", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("o", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("i", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("n", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(";", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("&", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("i", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("f", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("f", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("l", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("o", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("a", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("t", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("b", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("r", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("e", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("a", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("k", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("-", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("-", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("=", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("~", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("h", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("o", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("r", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("t", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("t", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("a", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("t", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("i", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("c", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("!", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("]", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("c", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("n", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("t", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("i", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("n", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("u", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								if(utf8chr("e", lexer_current_character(l))) {
+									lexer_advance(l);
+									consumed += 1;
+									goto EXIT;
+								} else {
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+								}
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("i", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("g", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("n", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("e", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("d", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("e", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("x", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("e", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("r", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("n", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("-", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("+", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("!", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
 	} else {
 	}
 	if(utf8chr("=", lexer_current_character(l))) {
@@ -198,7 +1497,7 @@ static size_t lexer_lex_builtin(Lexer *l) {
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr("{", lexer_current_character(l))) {
+	if(utf8chr("/", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
@@ -210,16 +1509,389 @@ static size_t lexer_lex_builtin(Lexer *l) {
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr("]", lexer_current_character(l))) {
+	if(utf8chr("<", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("<", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("s", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("w", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("i", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("t", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("c", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("h", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							goto EXIT;
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(")", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr(";", lexer_current_character(l))) {
+	if(utf8chr("+", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
+	} else {
+	}
+	if(utf8chr("u", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("n", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("i", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("o", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("n", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(".", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("&", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("&", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("&", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("u", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("n", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("s", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("i", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("g", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("n", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("e", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								if(utf8chr("d", lexer_current_character(l))) {
+									lexer_advance(l);
+									consumed += 1;
+									goto EXIT;
+								} else {
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+								}
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("e", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("l", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("s", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("e", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("d", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("e", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("f", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("a", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("u", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("l", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("t", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								goto EXIT;
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("d", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
 	} else {
 	}
 	if(utf8chr("|", lexer_current_character(l))) {
@@ -228,22 +1900,400 @@ static size_t lexer_lex_builtin(Lexer *l) {
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr("}", lexer_current_character(l))) {
+	if(utf8chr("[", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr(",", lexer_current_character(l))) {
+	if(utf8chr("^", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("c", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("n", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("s", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("t", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						goto EXIT;
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("<", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("^", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
 	} else {
 	}
-	if(utf8chr(")", lexer_current_character(l))) {
+	if(utf8chr("%", lexer_current_character(l))) {
 		lexer_advance(l);
 		consumed += 1;
 		goto EXIT;
+	} else {
+	}
+	if(utf8chr("<", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("/", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr(">", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr(":", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("+", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("+", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("|", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("|", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("t", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("y", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("p", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("e", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("d", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("e", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("f", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								goto EXIT;
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("<", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("<", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("=", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("*", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		goto EXIT;
+	} else {
+	}
+	if(utf8chr("r", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("e", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("g", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("i", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					if(utf8chr("s", lexer_current_character(l))) {
+						lexer_advance(l);
+						consumed += 1;
+						if(utf8chr("t", lexer_current_character(l))) {
+							lexer_advance(l);
+							consumed += 1;
+							if(utf8chr("e", lexer_current_character(l))) {
+								lexer_advance(l);
+								consumed += 1;
+								if(utf8chr("r", lexer_current_character(l))) {
+									lexer_advance(l);
+									consumed += 1;
+									goto EXIT;
+								} else {
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+									lexer_undo(l);
+									result -= 1;
+								}
+							} else {
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+								lexer_undo(l);
+								result -= 1;
+							}
+						} else {
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+							lexer_undo(l);
+							result -= 1;
+						}
+					} else {
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+						lexer_undo(l);
+						result -= 1;
+					}
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("l", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("o", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("n", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("g", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+				lexer_undo(l);
+				result -= 1;
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
+	} else {
+	}
+	if(utf8chr("|", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+		if(utf8chr("=", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			goto EXIT;
+		} else {
+			lexer_undo(l);
+			result -= 1;
+		}
 	} else {
 	}
 EXIT:
@@ -301,7 +2351,7 @@ Token lexer_lex(Lexer *l) {
 		return result;
 	}
 	if(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC_", c)) {
-		size_t length = lexer_lex_NONTERMINAL_IDENTIFIER(l);
+		size_t length = lexer_lex_IDENTIFIER(l);
 
 		if(length != 0) {
 			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
@@ -312,7 +2362,7 @@ Token lexer_lex(Lexer *l) {
 			}
 
 			result = (Token) {
-				.tag = TokenType_NONTERMINAL_IDENTIFIER,
+				.tag = TokenType_IDENTIFIER,
 				.lexeme = lexeme,
 				.pos = { 0 },
 			};
@@ -320,8 +2370,8 @@ Token lexer_lex(Lexer *l) {
 			return result;
 		}
 	}
-	if(utf8chr("$", c)) {
-		size_t length = lexer_lex_TERMINAL_IDENTIFIER(l);
+	if(utf8chr("53274189600X", c)) {
+		size_t length = lexer_lex_INTEGER_CONSTANT(l);
 
 		if(length != 0) {
 			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
@@ -332,7 +2382,7 @@ Token lexer_lex(Lexer *l) {
 			}
 
 			result = (Token) {
-				.tag = TokenType_TERMINAL_IDENTIFIER,
+				.tag = TokenType_INTEGER_CONSTANT,
 				.lexeme = lexeme,
 				.pos = { 0 },
 			};
@@ -340,8 +2390,8 @@ Token lexer_lex(Lexer *l) {
 			return result;
 		}
 	}
-	if(utf8chr("\"'", c)) {
-		size_t length = lexer_lex_LITERAL(l);
+	if(utf8chr("L'", c)) {
+		size_t length = lexer_lex_CHARACTER_CONSTANT(l);
 
 		if(length != 0) {
 			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
@@ -352,7 +2402,67 @@ Token lexer_lex(Lexer *l) {
 			}
 
 			result = (Token) {
-				.tag = TokenType_LITERAL,
+				.tag = TokenType_CHARACTER_CONSTANT,
+				.lexeme = lexeme,
+				.pos = { 0 },
+			};
+
+			return result;
+		}
+	}
+	if(utf8chr("5327041896.5327041896", c)) {
+		size_t length = lexer_lex_FLOATING_CONSTANT(l);
+
+		if(length != 0) {
+			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
+
+			if(lexeme == NULL) {
+				// Error
+				return result;
+			}
+
+			result = (Token) {
+				.tag = TokenType_FLOATING_CONSTANT,
+				.lexeme = lexeme,
+				.pos = { 0 },
+			};
+
+			return result;
+		}
+	}
+	if(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC_", c)) {
+		size_t length = lexer_lex_ENUMERATION_CONSTANT(l);
+
+		if(length != 0) {
+			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
+
+			if(lexeme == NULL) {
+				// Error
+				return result;
+			}
+
+			result = (Token) {
+				.tag = TokenType_ENUMERATION_CONSTANT,
+				.lexeme = lexeme,
+				.pos = { 0 },
+			};
+
+			return result;
+		}
+	}
+	if(utf8chr("\"", c)) {
+		size_t length = lexer_lex_STRING(l);
+
+		if(length != 0) {
+			Lexeme lexeme = l->ctx->io.copy_from(l->stream, l->ctx->io.tell(l->stream) - (length + 1), length + 1);
+
+			if(lexeme == NULL) {
+				// Error
+				return result;
+			}
+
+			result = (Token) {
+				.tag = TokenType_STRING,
 				.lexeme = lexeme,
 				.pos = { 0 },
 			};
@@ -366,7 +2476,7 @@ Token lexer_lex(Lexer *l) {
 
 	return result;
 }
-static size_t lexer_lex_NONTERMINAL_IDENTIFIER(Lexer *l) {
+static size_t lexer_lex_IDENTIFIER(Lexer *l) {
 	size_t result = 0;
 
 	size_t consumed = 0;
@@ -396,100 +2506,6 @@ static size_t lexer_lex_NONTERMINAL_IDENTIFIER(Lexer *l) {
 			}
 		}
 		result += consumed;
-	}
-	result += consumed;
-
-EXIT:
-	return result;
-}
-
-static size_t lexer_lex_TERMINAL_IDENTIFIER(Lexer *l) {
-	size_t result = 0;
-
-	size_t consumed = 0;
-	if(utf8chr("$", lexer_current_character(l))) {
-		lexer_advance(l);
-		consumed += 1;
-	} else {
-	}
-	{
-		size_t consumed = 0;
-		consumed += lexer_lex_LETTER(l);
-		if(consumed == 0) {
-			if(utf8chr("_", lexer_current_character(l))) {
-				lexer_advance(l);
-				consumed += 1;
-			} else {
-			}
-		}
-		result += consumed;
-	}
-	while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896_", lexer_current_character(l))) {
-		size_t consumed = 0;
-		consumed += lexer_lex_LETTER(l);
-		if(consumed == 0) {
-			consumed += lexer_lex_DIGIT(l);
-		}
-		if(consumed == 0) {
-			if(utf8chr("_", lexer_current_character(l))) {
-				lexer_advance(l);
-				consumed += 1;
-			} else {
-			}
-		}
-		result += consumed;
-	}
-	result += consumed;
-
-EXIT:
-	return result;
-}
-
-static size_t lexer_lex_LITERAL(Lexer *l) {
-	size_t result = 0;
-
-	size_t consumed = 0;
-	if(consumed == 0) {
-		if(utf8chr("'", lexer_current_character(l))) {
-			lexer_advance(l);
-			consumed += 1;
-		} else {
-		}
-		if(consumed != 0) {
-			while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896[=-{/#_\"($^`;&%<, )+>:\\?.~*!]}|@", lexer_current_character(l))) {
-				size_t consumed = 0;
-				consumed += lexer_lex_CHARACTER(l);
-				result += consumed;
-			}
-		}
-		if(consumed != 0) {
-			if(utf8chr("'", lexer_current_character(l))) {
-				lexer_advance(l);
-				consumed += 1;
-			} else {
-			}
-		}
-	}
-	if(consumed == 0) {
-		if(utf8chr("\"", lexer_current_character(l))) {
-			lexer_advance(l);
-			consumed += 1;
-		} else {
-		}
-		if(consumed != 0) {
-			while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896'[=-{/#_\($^`;&%<, )+>:\\?.~*!]}|@", lexer_current_character(l))) {
-				size_t consumed = 0;
-				consumed += lexer_lex_CHARACTER(l);
-				result += consumed;
-			}
-		}
-		if(consumed != 0) {
-			if(utf8chr("\"", lexer_current_character(l))) {
-				lexer_advance(l);
-				consumed += 1;
-			} else {
-			}
-		}
 	}
 	result += consumed;
 
@@ -1159,28 +3175,7 @@ static size_t lexer_lex_SYMBOL(Lexer *l) {
 		}
 	}
 	if(consumed == 0) {
-		if(utf8chr("\\", lexer_current_character(l))) {
-			lexer_advance(l);
-			consumed += 1;
-		} else {
-		}
-	}
-	if(consumed == 0) {
 		if(utf8chr("'", lexer_current_character(l))) {
-			lexer_advance(l);
-			consumed += 1;
-		} else {
-		}
-	}
-	if(consumed == 0) {
-		if(utf8chr("\"", lexer_current_character(l))) {
-			lexer_advance(l);
-			consumed += 1;
-		} else {
-		}
-	}
-	if(consumed == 0) {
-		if(utf8chr(" ", lexer_current_character(l))) {
 			lexer_advance(l);
 			consumed += 1;
 		} else {
@@ -1192,18 +3187,879 @@ EXIT:
 	return result;
 }
 
-static size_t lexer_lex_CHARACTER(Lexer *l) {
+static size_t lexer_lex_INTEGER_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	{
+		size_t consumed = 0;
+		consumed += lexer_lex_DECIMAL_CONSTANT(l);
+		if(consumed == 0) {
+			consumed += lexer_lex_OCTAL_CONSTANT(l);
+		}
+		if(consumed == 0) {
+			consumed += lexer_lex_HEX_CONSTANT(l);
+		}
+		result += consumed;
+	}
+	if(utf8chr("LULL", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_INTEGER_SUFFIX(l);
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_DECIMAL_CONSTANT(Lexer *l) {
 	size_t result = 0;
 
 	size_t consumed = 0;
 	if(consumed == 0) {
-		consumed += lexer_lex_LETTER(l);
+		if(utf8chr("1", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("2", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("3", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("4", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("5", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("6", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("7", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("8", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("9", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed != 0) {
+			while(utf8chr("5327041896", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_DIGIT(l);
+				result += consumed;
+			}
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_OCTAL_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("0", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	while(utf8chr("01234567", lexer_current_character(l))) {
+		size_t consumed = 0;
+		if(utf8chr("0", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed == 0) {
+			if(utf8chr("1", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("2", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("3", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("4", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("5", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("6", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("7", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_HEX_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	{
+		size_t consumed = 0;
+		if(utf8chr("0", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("X", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+		}
+		if(consumed == 0) {
+			if(utf8chr("0", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				if(utf8chr("X", lexer_current_character(l))) {
+					lexer_advance(l);
+					consumed += 1;
+					goto EXIT;
+				} else {
+					lexer_undo(l);
+					result -= 1;
+				}
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	consumed += lexer_lex_HEX_DIGIT(l);
+	while(utf8chr("BFDE5327041896CA", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_HEX_DIGIT(l);
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_HEX_DIGIT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		consumed += lexer_lex_DIGIT(l);
+	}
+	if(consumed == 0) {
+		if(utf8chr("A", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("B", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("C", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("D", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("E", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("F", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("A", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("B", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("C", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("D", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("E", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("F", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_INTEGER_SUFFIX(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("U", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("U", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("L", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+			if(utf8chr("L", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+				goto EXIT;
+			} else {
+				lexer_undo(l);
+				result -= 1;
+			}
+		} else {
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_CHARACTER_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("L", lexer_current_character(l))) {
+		size_t consumed = 0;
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		result += consumed;
+	}
+	if(utf8chr("'", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	{
+		size_t consumed = 0;
+		consumed += lexer_lex_C_CHAR(l);
+		if(consumed == 0) {
+			consumed += lexer_lex_ESCAPE_SEQUENCE(l);
+		}
+		result += consumed;
+	}
+	if(utf8chr("'", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_C_CHAR(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	consumed += lexer_lex_STRING_CHARACTER(l);
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_FLOATING_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		consumed += lexer_lex_FRACTIONAL_CONSTANT(l);
+		if(consumed != 0) {
+			if(utf8chr("Ee", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_EXPONENT_PART(l);
+				result += consumed;
+			}
+		}
+		if(consumed != 0) {
+			if(utf8chr("LFfl", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_FLOAT_SUFFIX(l);
+				result += consumed;
+			}
+		}
+	}
+	if(consumed == 0) {
+		consumed += lexer_lex_DIGIT_SEQUENCE(l);
+		if(consumed != 0) {
+			consumed += lexer_lex_EXPONENT_PART(l);
+		}
+		if(consumed != 0) {
+			if(utf8chr("LFfl", lexer_current_character(l))) {
+				size_t consumed = 0;
+				consumed += lexer_lex_FLOAT_SUFFIX(l);
+				result += consumed;
+			}
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_FRACTIONAL_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("5327041896", lexer_current_character(l))) {
+			size_t consumed = 0;
+			consumed += lexer_lex_DIGIT_SEQUENCE(l);
+			result += consumed;
+		}
+		if(consumed != 0) {
+			if(utf8chr(".", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed != 0) {
+			consumed += lexer_lex_DIGIT_SEQUENCE(l);
+		}
+	}
+	if(consumed == 0) {
+		consumed += lexer_lex_DIGIT_SEQUENCE(l);
+		if(consumed != 0) {
+			if(utf8chr(".", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_EXPONENT_PART(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	{
+		size_t consumed = 0;
+		if(utf8chr("E", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed == 0) {
+			if(utf8chr("e", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	if(utf8chr("+-", lexer_current_character(l))) {
+		size_t consumed = 0;
+		if(utf8chr("+", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed == 0) {
+			if(utf8chr("-", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		result += consumed;
+	}
+	consumed += lexer_lex_DIGIT_SEQUENCE(l);
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_DIGIT_SEQUENCE(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	consumed += lexer_lex_DIGIT(l);
+	while(utf8chr("5327041896", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_DIGIT(l);
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_FLOAT_SUFFIX(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("F", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("f", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("L", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("l", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_ENUMERATION_CONSTANT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	consumed += lexer_lex_IDENTIFIER(l);
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_STRING(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("\"", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	while(utf8chr("MFxYripdXKcQEDlySOhHmPBUJzVAIkLoaZgTGfueWwRnqbjtNsvC5327041896'[=-{/#_($^`;&%<,)+>:?.~*!]}|@\\", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_STRING_CHARACTER(l);
+		if(consumed == 0) {
+			consumed += lexer_lex_ESCAPE_SEQUENCE(l);
+		}
+		result += consumed;
+	}
+	if(utf8chr("\"", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_STRING_CHARACTER(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		consumed += lexer_lex_SYMBOL(l);
 	}
 	if(consumed == 0) {
 		consumed += lexer_lex_DIGIT(l);
 	}
 	if(consumed == 0) {
-		consumed += lexer_lex_SYMBOL(l);
+		consumed += lexer_lex_LETTER(l);
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_ESCAPE_SEQUENCE(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("\\", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	{
+		size_t consumed = 0;
+		if(utf8chr("'", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+		if(consumed == 0) {
+			if(utf8chr("\"", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("?", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("\\", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("a", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("b", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("f", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("n", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("r", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("t", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			if(utf8chr("v", lexer_current_character(l))) {
+				lexer_advance(l);
+				consumed += 1;
+			} else {
+			}
+		}
+		if(consumed == 0) {
+			consumed += lexer_lex_OCTAL_ESCAPE(l);
+		}
+		if(consumed == 0) {
+			consumed += lexer_lex_HEX_ESCAPE(l);
+		}
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_OCTAL_ESCAPE(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	consumed += lexer_lex_OCTAL_DIGIT(l);
+	if(utf8chr("41532706", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_OCTAL_DIGIT(l);
+		result += consumed;
+	}
+	if(utf8chr("41532706", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_OCTAL_DIGIT(l);
+		result += consumed;
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_OCTAL_DIGIT(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(consumed == 0) {
+		if(utf8chr("0", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("1", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("2", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("3", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("4", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("5", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("6", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	if(consumed == 0) {
+		if(utf8chr("7", lexer_current_character(l))) {
+			lexer_advance(l);
+			consumed += 1;
+		} else {
+		}
+	}
+	result += consumed;
+
+EXIT:
+	return result;
+}
+
+static size_t lexer_lex_HEX_ESCAPE(Lexer *l) {
+	size_t result = 0;
+
+	size_t consumed = 0;
+	if(utf8chr("x", lexer_current_character(l))) {
+		lexer_advance(l);
+		consumed += 1;
+	} else {
+	}
+	consumed += lexer_lex_HEX_DIGIT(l);
+	while(utf8chr("BFDE5327041896CA", lexer_current_character(l))) {
+		size_t consumed = 0;
+		consumed += lexer_lex_HEX_DIGIT(l);
+		result += consumed;
 	}
 	result += consumed;
 
